@@ -5,6 +5,10 @@ https://info.atcoder.jp/entry/llm-rules-ja
 
 # このリポジトリに上がっているリソースは競技プログラミング目的の範囲でご自由にお使いください
 
-# AtCoderの生成AI対策ルール順守のためリポジトリ内のリソースを利用した提出コードには以下のコメントを記載
-[SOURCE]<br>
-https://github.com/regularambition/forCompetitiveProgramming
+# AtCoderの生成AI対策ルール遵守のためコンテスト本番中にリポジトリ内のリソースを利用した提出コードには以下のコメントを記載
+~~~
+/**
+ * [SOURCE]
+ * https://github.com/regularambition/forCompetitiveProgramming
+ */
+~~~
