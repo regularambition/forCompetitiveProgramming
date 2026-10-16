@@ -1,0 +1,37 @@
+template <class seisu> struct SectionSum {
+  seisu total;
+  seisu len;
+
+  SectionSum(seisu t, seisu l) : total(t), len(l) {
+  }
+};
+
+/**
+ * 遅延セグメント木が以下の要件を満たす場合に使う関数定義
+ * 実配列・遅延作用素ともに整数を扱う
+ * 実配列が保持する情報：区間和
+ * 遅延作用素：区間に対して一律で固定値を加算
+ */
+template <class seisu> struct ActionsForSectionSumSectionAdd {
+  SectionSum<seisu> biop(const SectionSum<seisu> &d1, const SectionSum<seisu> &d2) const {
+    return SectionSum<seisu>(d1.total + d2.total, d1.len + d2.len);
+  }
+
+  SectionSum<seisu> id_element() const {
+    return SectionSum<seisu>(0, 0);
+  }
+
+  SectionSum<seisu> mapping(const SectionSum<seisu> &d, const seisu &f) const {
+    return SectionSum<seisu>(d.total + f * d.len, d.len);
+  }
+
+  seisu composition(const seisu &f, const seisu &g) const {
+    return g + f;
+  }
+
+  seisu id_mapping() const {
+    return 0;
+  }
+};
+
+template <class seisu> using SegmentTree = LazySegTree<SectionSum<seisu>, seisu, ActionsForSectionSumSectionAdd<seisu>>;

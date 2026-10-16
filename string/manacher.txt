@@ -1,0 +1,46 @@
+/**
+ * 入力された文字列s中の各位置を中心とした場合における
+ * 回文の長さの最大値を保持したリストを返す
+ * 返却されるリストの要素数は|s| * 2 + 1であり
+ * 偶数インデックスは隣接2文字同士の隙間を中心と考えた場合における
+ * 結果（偶数長の回文）を保持しており、奇数インデックスは各文字を
+ * 中心と考えた場合における結果（奇数長の回文）を保持している
+ * 計算量はO(|s|)となる
+ */
+vector<ll> manacher(string& s) {
+  // 必要に応じてダミー文字を変更して使う
+  const char DUMMY = '#';
+
+  const ll slen = s.length();
+  string t = string(2 * slen + 1, DUMMY);
+  for (ll i = 0; i < slen; ++i) {
+    t[2 * i + 1] = s[i];
+  }
+
+  const ll tlen = t.length();
+  vector<ll> radius(tlen);
+  ll c_pal = 0, r_lim_pal = 0;
+
+  for (ll i = 0; i < tlen; ++i) {
+    // 対称性の利用
+    if (i < r_lim_pal) {
+      ll i_mirror = 2 * c_pal - i;
+      radius[i] = min(r_lim_pal - i, radius[i_mirror]);
+    }
+
+    // 回文を拡張
+    ll l = i - (radius[i] + 1);
+    ll r = i + (radius[i] + 1);
+    while (l >= 0 && r < tlen && t[l] == t[r]) {
+      ++radius[i];
+      --l;
+      ++r;
+    }
+
+    if (chmax(r_lim_pal, i + radius[i])) {
+      c_pal = i;
+    }
+  }
+
+  return radius;
+}

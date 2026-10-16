@@ -1,0 +1,154 @@
+/**
+ * 実配列はDataType型の要素を持ち、作用素はOpType型であるセグメント木
+ * DataType型の値2つを統合してDataType型の値を返す演算を「積」と呼ぶ
+ * vectorで列を扱う時と同様に0-indexedを前提とする
+ * 
+ * Actionsが備えているべき関数は以下の通り
+ * 0) biop(DataType, DataType)は2つのDataTypeの積として得られる
+ * DataType型の値を返す
+ * 1) id_element()はDataType型の単位元を返す
+ * 2) mapping(DataType, OpType)はDataType型に
+ * OpType型を作用させて得られるDataType型の値を返す
+ */
+template <class DataType, class OpType, class Actions> class SegTree {
+  ll num_leaf, net_len;
+  vector<DataType> data;
+  Actions actions;
+
+  /**
+   * ノードkが子を持つ場合true、持たない場合はfalseを返す
+   */
+  bool has_children(ll k) {
+    return k < num_leaf;
+  }
+
+  /**
+   * 区間[a,b)に属する要素の総積を求めるクエリに対し
+   * ノードk（担当区間は[l,r)である）が答える
+   */
+  DataType rec_find_section_mul(ll a, ll b, ll k, ll l, ll r) {
+    if (r <= a || b <= l) {
+      // ノードkの担当範囲が区間[a,b)と一切被らない
+      return actions.id_element();
+    }
+
+    if (a <= l && r <= b) {
+      // ノードkの担当範囲が区間[a,b)に完全に含まれる
+      return data[k];
+    } else {
+      // 一部だけ範囲が被る場合は左右の子に対して再帰呼び出し
+
+      // 左の子
+      DataType c1 = rec_find_section_mul(a, b, 2 * k, l, (l + r) / 2);
+
+      // 右の子
+      DataType c2 = rec_find_section_mul(a, b, 2 * k + 1, (l + r) / 2, r);
+
+      // 左右の子の値の積を返す
+      return actions.biop(c1, c2);
+    }
+  }
+
+  // max_rightの探索補助関数
+  template <class G> ll rec_max_right(ll a, ll b, G &g, DataType &s, ll k, ll l, ll r) {
+    if (r <= a || b <= l) {
+      // ノードkの担当範囲が区間[a,b)と一切被らない
+      return INF64;
+    }
+
+    const DataType tmp = actions.biop(s, data[k]);
+    if (!has_children(k)) {
+      // 葉ならばノードの担当区間が必ず区間[a,b)に完全に含まれる
+      if (g(tmp)) {
+        s = tmp;
+        return r;
+      } else {
+        return l;
+      }
+    }
+
+    if (a <= l && r <= b && g(tmp)) {
+      // ノードkの担当範囲が区間[a,b)に完全に含まれ、且つ
+      // 区間[l,r)を全て取り込んでも条件を満たすならば全て取り込む
+      s = tmp;
+      return r;
+    }
+
+    const ll mid = mid_of(l, r);
+    ll res_left = rec_max_right(a, b, g, s, 2 * k, l, mid);
+    if (res_left < mid) {
+      // 左の子の担当区間だけで答えが確定する場合はすぐさま返して終了
+      return res_left;
+    }
+
+    // 左の子の担当区間を全て取り込んでも条件を満たす場合は右の子について再帰
+    ll res_right = rec_max_right(a, b, g, s, 2 * k + 1, mid, r);
+    if (res_right == INF64) {
+      return res_left;
+    } else {
+      return res_right;
+    }
+  }
+
+public:
+  SegTree(ll n, Actions ops) : net_len(n), actions(std::move(ops)) {
+    num_leaf = 1;
+    while (num_leaf < n) {
+      num_leaf *= 2;
+    }
+
+    data.resize(2 * num_leaf, actions.id_element());
+  }
+
+  SegTree(vector<DataType> v, Actions ops) : SegTree((ll)v.size(), std::move(ops)) {
+    rep(i, net_len) {
+      data[i + num_leaf] = v[i];
+    }
+
+    invrep_closed(i, num_leaf - 1, 1) {
+      data[i] = actions.biop(data[2 * i], data[2 * i + 1]);
+    }
+  }
+
+  SegTree(ll n) : SegTree(n, Actions()) {
+  }
+
+  SegTree(vector<DataType> v) : SegTree(v, Actions()) {
+  }
+
+  // 区間[a,b)に属する要素の総積を求める
+  DataType find_section_mul(ll a, ll b) {
+    return rec_find_section_mul(a, b, 1, 0, num_leaf);
+  }
+  // 実配列におけるi番目の要素を返す
+  DataType leaf_value(ll i) {
+    return data[i + num_leaf];
+  }
+  // i番目の要素に作用素xを作用させる
+  void apply(ll i, OpType x) {
+    i += num_leaf;
+    data[i] = actions.mapping(data[i], x);
+    while (i > 1) {
+      i /= 2;
+      data[i] = actions.biop(data[2 * i], data[2 * i + 1]);
+    }
+  }
+  /**
+   * 主張「区間[a,x)に属する要素の総積が条件gを満たす」
+   * が成立するようなbを超えない最大の整数xを返す
+   * gはDataType型1つを引数としたbool値を返す関数
+   */
+  template <class G> ll max_right(ll a, ll b, G &g) {
+    assert(a <= b);
+    assert(0 <= a && a <= net_len);
+    assert(0 <= b && b <= net_len);
+    assert(g(actions.id_element()));
+
+    if (a == b) {
+      return b;
+    }
+
+    DataType s = actions.id_element();
+    return rec_max_right(a, b, g, s, 1, 0, num_leaf);
+  }
+};

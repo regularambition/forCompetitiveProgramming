@@ -1,0 +1,309 @@
+/**
+ * ローリングハッシュを利用する問題向け
+ * 整数の演算を mod (2^61 - 1) で行うクラス
+ */
+class ModInt {
+private:
+  static const ll WHOLE_BIT_WIDTH = 61;
+  static const ll MOD = (1LL << WHOLE_BIT_WIDTH) - 1;
+
+  ll val;
+
+  static ll normalize(__int128_t z) {
+    assert(z >= 0);
+
+    ll a = z >> WHOLE_BIT_WIDTH;
+    ll b = z & MOD;
+
+    ll res = a + b;
+    if (res >= MOD) {
+      res -= MOD;
+    }
+
+    return res;
+  }
+
+public:
+  ModInt(ll x = 0) : val(normalize(x)) {
+  }
+
+  ll get_val() const {
+    return val;
+  }
+
+  static ll get_mod() {
+    return MOD;
+  }
+
+  ModInt &operator+=(const ModInt &other) {
+    val += other.val;
+    if (val >= MOD) {
+      val -= MOD;
+    }
+    return *this;
+  }
+  ModInt &operator-=(const ModInt &other) {
+    val -= other.val;
+    if (val < 0) {
+      val += MOD;
+    }
+    return *this;
+  }
+  ModInt &operator*=(const ModInt &other) {
+    val = normalize((__int128_t)val * other.val);
+    return *this;
+  }
+  ModInt &operator/=(const ModInt &other) {
+    return *this *= other.inverse();
+  }
+
+  ModInt operator+(const ModInt &other) const {
+    ModInt result = *this;
+    return result += other;
+  }
+  ModInt operator-(const ModInt &other) const {
+    ModInt result = *this;
+    return result -= other;
+  }
+  ModInt operator*(const ModInt &other) const {
+    ModInt result = *this;
+    return result *= other;
+  }
+  ModInt operator/(const ModInt &other) const {
+    ModInt result = *this;
+    return result /= other;
+  }
+
+  ModInt modpow(ll n) const {
+    assert(n >= 0);
+
+    ModInt res = 1, base = *this;
+    while (n > 0) {
+      if (n & 1) {
+        res *= base;
+      }
+      base *= base;
+      n >>= 1;
+    }
+
+    return res;
+  }
+
+  ModInt inverse() const {
+    assert(val != 0);
+    return modpow(MOD - 2);
+  }
+
+  friend std::ostream &operator<<(std::ostream &os, const ModInt &x) {
+    return os << x.val;
+  }
+
+  friend std::istream &operator>>(std::istream &is, ModInt &x) {
+    ll tmp;
+    is >> tmp;
+    x.val = x.normalize(tmp);
+    return is;
+  }
+
+  bool operator<(const ModInt &other) const {
+    return this->val < other.val;
+  }
+  bool operator<=(const ModInt &other) const {
+    return this->val <= other.val;
+  }
+  bool operator>(const ModInt &other) const {
+    return this->val > other.val;
+  }
+  bool operator>=(const ModInt &other) const {
+    return this->val >= other.val;
+  }
+  bool operator==(const ModInt &other) const {
+    return this->val == other.val;
+  }
+  bool operator!=(const ModInt &other) const {
+    return this->val != other.val;
+  }
+};
+
+/**
+ * 静的な文字列をローリングハッシュにより解析する問題向けのクラス
+ * インスタンス生成にかかる時間計算量は文字列sの長さをnとしてO(n)
+ */
+class RollingHash {
+private:
+  static constexpr ll MINIMUM_BASE = 256;
+
+  ll n;
+  ModInt base;
+  vector<ModInt> beki, hash;
+
+public:
+  static ll generate_base() {
+    return generate_random_integer(MINIMUM_BASE, ModInt::get_mod() - 2);
+  }
+
+  RollingHash(const string &s, ll b) {
+    n = s.length();
+    base = b;
+    beki.resize(n + 1, 1);
+
+    rep(i, n) {
+      beki[i + 1] = beki[i] * base;
+    }
+
+    hash.resize(n + 1, 0);
+    rep(i, n) {
+      hash[i + 1] = base * hash[i] + s[i];
+    }
+  }
+
+  /**
+   * s[a,b)のハッシュ値を定数時間で返す
+   */
+  ModInt section_hash(ll a, ll b) {
+    assert(a <= b);
+    return hash[b] - beki[b - a] * hash[a];
+  }
+};
+
+// ####################################
+// ####################################
+// ####################################
+// ####################################
+// ####################################
+
+/**
+ * 長さNの文字列を受け取り、ローリングハッシュを
+ * 遅延セグメント木で動的に管理するクラス
+ * 変更操作は「指定した区間の文字を全て指定した文字に置換」
+ * インスタンス生成にかかる時間計算量はO(N)
+ */
+class RollingHash {
+private:
+  struct HashData {
+    ModInt hash_forward;
+    ModInt hash_backward;
+    ll len;
+
+    HashData(ModInt hf, ModInt hb, ll l) : hash_forward(hf), hash_backward(hb), len(l) {
+    }
+  };
+
+  struct Assignment {
+    char ch;
+    bool data_exists;
+
+    Assignment(char ch_arg, bool ex) : ch(ch_arg), data_exists(ex) {
+    }
+  };
+
+  struct ActionsForRollingHash {
+
+    vector<ModInt> beki, geom;
+
+    ActionsForRollingHash(ll n, ModInt base) : beki(n + 1, 1), geom(n + 1, 0) {
+      rep(i, n) {
+        beki[i + 1] = beki[i] * base;
+        geom[i + 1] = geom[i] * base + 1;
+      }
+    }
+
+    HashData biop(const HashData &d1, const HashData &d2) const {
+      return HashData(beki[d2.len] * d1.hash_forward + d2.hash_forward,
+                      beki[d1.len] * d2.hash_backward + d1.hash_backward, d1.len + d2.len);
+    }
+
+    HashData id_element() const {
+      return HashData(0, 0, 0);
+    }
+
+    HashData mapping(const HashData &d, const Assignment &f) const {
+      if (!f.data_exists) {
+        return d;
+      }
+
+      ModInt new_hash_val = geom[d.len] * f.ch;
+      return HashData(new_hash_val, new_hash_val, d.len);
+    }
+
+    Assignment composition(const Assignment &f, const Assignment &g) const {
+      if (!f.data_exists) {
+        return g;
+      }
+      return f;
+    }
+
+    Assignment id_mapping() const {
+      return Assignment('$', false);
+    }
+  };
+
+  static constexpr ll MINIMUM_BASE = 256;
+
+  using SegmentTree = LazySegTree<HashData, Assignment, ActionsForRollingHash>;
+
+  ll n;
+  ModInt base;
+  SegmentTree sgtr;
+
+  static vector<HashData> make_initial_data(const string &s) {
+    vector<HashData> v;
+    v.reserve(s.size());
+
+    for (char c : s) {
+      ModInt h = c;
+      v.emplace_back(h, h, 1);
+    }
+
+    return v;
+  }
+
+public:
+  static ll generate_base() {
+    return generate_random_integer(MINIMUM_BASE, ModInt::get_mod() - 2);
+  }
+
+  RollingHash(const string &s, ll b)
+      : n(s.length()), base(b), sgtr(make_initial_data(s), ActionsForRollingHash(n, base)) {
+  }
+
+  RollingHash(const string &s) : RollingHash(s, generate_base()) {
+  }
+
+  /**
+   * s[a,b)の順方向ハッシュ値を返す
+   * 時間計算量はO(logN)
+   */
+  ModInt section_hash(ll a, ll b) {
+    assert(a <= b);
+    return sgtr.find_section_mul(a, b).hash_forward;
+  }
+
+  /**
+   * s[a,b)の全文字をxに一括変更する
+   * 時間計算量はO(logN)
+   */
+  void update_section(ll a, ll b, char x) {
+    assert(a <= b);
+    sgtr.apply(a, b, Assignment(x, true));
+  }
+
+  /**
+   * s[i]をxに変更する
+   * 時間計算量はO(logN)
+   */
+  void update_single(ll i, char x) {
+    update_section(i, i + 1, x);
+  }
+
+  /**
+   * s[a,b)が回文ならばtrue、そうでなければfalseを返す
+   * 時間計算量はO(logN)
+   */
+  bool is_palindrome(ll a, ll b) {
+    assert(a <= b);
+
+    HashData H = sgtr.find_section_mul(a, b);
+    return H.hash_forward == H.hash_backward;
+  }
+};

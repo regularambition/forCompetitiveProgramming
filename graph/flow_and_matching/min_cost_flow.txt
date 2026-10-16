@@ -1,0 +1,227 @@
+/**
+ * 最小費用流問題を解くのに利用するクラス
+ * 頂点数V、辺数E、流すフローFに対する時間計算量はO(F * E * logV)
+ * 重み付き最大二部マッチング問題を解く場合は
+ * find_max_weight_bipartite_matchingを呼び出す
+ */
+class MinCostFlow {
+  struct Edge {
+    ll dest;
+    ll remaining_hp;
+    ll cost;  // この辺に1単位流すのに必要な費用
+    ll rev;
+
+    Edge(ll dest, ll remaining_hp, ll cost, ll rev) {
+      this->dest = dest;
+      this->remaining_hp = remaining_hp;
+      this->cost = cost;
+      this->rev = rev;
+    }
+  };
+
+  ll n;
+  vector<vector<Edge>> G;
+
+public:
+  explicit MinCostFlow(ll n) : n(n), G(n) {
+  }
+
+  /**
+   * fromからtoへ伸びる、容量capacityで
+   * 1単位流すのに必要な費用がcost（非負整数）である辺を追加
+   */
+  void add_edge(ll from, ll to, ll capacity, ll cost) {
+    assert(0 <= from && from < n);
+    assert(0 <= to && to < n);
+    assert(capacity >= 0);
+    assert(cost >= 0);
+
+    ll from_rev = (ll)G[to].size();
+    ll to_rev = (ll)G[from].size();
+
+    G[from].emplace_back(to, capacity, cost, from_rev);
+    G[to].emplace_back(from, 0, -cost, to_rev);
+  }
+
+  /**
+   * flow_limit以下という制約の下でsrcからdrainへ水を流す
+   * 返されるのは {流量、その流量に必要な最小費用}
+   * という形式の情報を流量について昇順に保持した列
+   * 残余グラフを変更するため同じインスタンスに対して呼ばれるのは一度きりにする
+   */
+  vector<pair<ll, ll>> find_min_cost_slope(ll src, ll drain, ll flow_limit) {
+    assert(0 <= src && src < n);
+    assert(0 <= drain && drain < n);
+    assert(src != drain);
+    assert(flow_limit >= 0);
+
+    vector<ll> potential(n, 0);
+    vector<ll> dist(n);
+
+    vector<ll> previous_vertex(n);
+    vector<ll> previous_edge(n);
+
+    ll flow = 0;
+    ll total_cost = 0;
+
+    vector<pair<ll, ll>> res;
+    res.emplace_back(0, 0);
+
+    bool has_previous_marginal_cost = false;
+    ll previous_marginal_cost = 0;
+
+    while (flow < flow_limit) {
+      fill(ALL(dist), INF64);
+
+      using QueueElement = pair<ll, ll>;
+      g_prique<QueueElement> que;
+
+      dist[src] = 0;
+      que.emplace(0, src);
+
+      while (!que.empty()) {
+        auto [current_dist, v] = que.top();
+        que.pop();
+
+        if (current_dist != dist[v]) {
+          continue;
+        }
+
+        rep(edge_idx, G[v].size()) {
+          const Edge &edge = G[v][edge_idx];
+
+          if (edge.remaining_hp == 0) {
+            continue;
+          }
+
+          ll reduced_cost = edge.cost + potential[v] - potential[edge.dest];
+          ll new_dist = current_dist + reduced_cost;
+
+          if (new_dist < dist[edge.dest]) {
+            dist[edge.dest] = new_dist;
+            previous_vertex[edge.dest] = v;
+            previous_edge[edge.dest] = edge_idx;
+            que.emplace(new_dist, edge.dest);
+          }
+        }
+      }
+
+      if (dist[drain] == INF64) {
+        // drainへ到達できない場合はもう流せないということなので打ち切る
+        break;
+      }
+
+      rep(v, n) {
+        if (dist[v] != INF64) {
+          potential[v] += dist[v];
+        }
+      }
+
+      ll gain = flow_limit - flow;
+      for (ll v = drain; v != src; v = previous_vertex[v]) {
+        ll pv = previous_vertex[v];
+        ll pe = previous_edge[v];
+
+        chmin(gain, G[pv][pe].remaining_hp);
+      }
+
+      ll marginal_cost = potential[drain] - potential[src];
+
+      for (ll v = drain; v != src; v = previous_vertex[v]) {
+        ll pv = previous_vertex[v];
+        ll pe = previous_edge[v];
+
+        Edge &edge = G[pv][pe];
+
+        edge.remaining_hp -= gain;
+        G[v][edge.rev].remaining_hp += gain;
+      }
+
+      flow += gain;
+      total_cost += gain * marginal_cost;
+
+      if (has_previous_marginal_cost && previous_marginal_cost == marginal_cost) {
+        res.pop_back();
+      }
+
+      res.emplace_back(flow, total_cost);
+
+      previous_marginal_cost = marginal_cost;
+      has_previous_marginal_cost = true;
+    }
+
+    return res;
+  }
+
+  /**
+   * flow_limit以下という制約の下で可能な限り流し
+   * {実際に流せた量、そのために必要な最小費用}
+   * という形式の情報を返す
+   */
+  pair<ll, ll> find_min_cost_flow(ll src, ll drain, ll flow_limit) {
+    auto slope = find_min_cost_slope(src, drain, flow_limit);
+    return slope.back();
+  }
+
+  struct WeightedMatchingResult {
+    ll max_gain;
+    ll matching_size;
+  };
+
+  /**
+   * 重み付き最大二部マッチング問題を解く
+   * weighted_edgesは{左側頂点番号、右側頂点番号、辺の重み}
+   * という形式の情報を保持した列
+   * 左側頂点番号は0 <= lft < lft_size
+   * 右側頂点番号は0 <= rgt < rgt_size
+   * として渡す（全ての頂点番号が0から一連の整数列となるように内部処理で自動換算される）
+   * 返されるのは{最適なマッチングを選んだ場合における合計利得、マッチング数}
+   * という形式の情報
+   */
+  static WeightedMatchingResult find_max_weight_bipartite_matching(ll lft_size, ll rgt_size,
+                                                                   const vector<tuple<ll, ll, ll>> &weighted_edges) {
+    ll base = 0;
+    for (auto [lft, rgt, weight] : weighted_edges) {
+      assert(0 <= lft && lft < lft_size);
+      assert(0 <= rgt && rgt < rgt_size);
+      chmax(base, weight);
+    }
+
+    if (base == 0) {
+      return {0, 0};
+    }
+
+    const ll src = lft_size + rgt_size;
+    const ll drain = src + 1;
+
+    MinCostFlow mcf(lft_size + rgt_size + 2);
+    rep(lft, lft_size) {
+      mcf.add_edge(src, lft, 1, 0);
+    }
+    for (auto [lft, rgt, weight] : weighted_edges) {
+      if (weight <= 0) {
+        continue;
+      }
+
+      mcf.add_edge(lft, lft_size + rgt, 1, base - weight);
+    }
+    rep(rgt, rgt_size) {
+      mcf.add_edge(lft_size + rgt, drain, 1, 0);
+    }
+
+    ll flow_limit = min(lft_size, rgt_size);
+    auto slope = mcf.find_min_cost_slope(src, drain, flow_limit);
+
+    WeightedMatchingResult res{0, 0};
+    for (auto [flow, cost] : slope) {
+      ll weight_sum = flow * base - cost;
+
+      if (chmax(res.max_gain, weight_sum)) {
+        res.max_gain = weight_sum;
+        res.matching_size = flow;
+      }
+    }
+
+    return res;
+  }
+};

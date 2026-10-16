@@ -1,0 +1,223 @@
+class ModInt {
+private:
+  const static ll NTT_MOD = 998244353;
+  const static ll PRIMITIVE_ROOT = 3;
+  ll val;
+
+  ll normalize(ll x) const {
+    x %= NTT_MOD;
+    if (x < 0) {
+      x += NTT_MOD;
+    }
+    return x;
+  }
+
+public:
+  ModInt(ll x = 0) : val(normalize(x)) {
+  }
+
+  ModInt operator+(const ModInt &other) const {
+    return ModInt(val + other.val);
+  }
+  ModInt operator-(const ModInt &other) const {
+    return ModInt(val - other.val);
+  }
+  ModInt operator*(const ModInt &other) const {
+    return ModInt(val * other.val);
+  }
+  ModInt operator/(const ModInt &other) const {
+    return *this * other.inverse();
+  }
+
+  ModInt &operator+=(const ModInt &other) {
+    val = normalize(val + other.val);
+    return *this;
+  }
+  ModInt &operator-=(const ModInt &other) {
+    val = normalize(val - other.val);
+    return *this;
+  }
+  ModInt &operator*=(const ModInt &other) {
+    val = normalize(val * other.val);
+    return *this;
+  }
+  ModInt &operator/=(const ModInt &other) {
+    *this = *this / other;
+    return *this;
+  }
+
+  ModInt modpow(ll n) const {
+    ModInt res = 1, base = *this;
+    while (n > 0) {
+      if (n & 1) {
+        res *= base;
+      }
+      base *= base;
+      n >>= 1;
+    }
+    return res;
+  }
+
+  ModInt inverse() const {
+    return modpow(NTT_MOD - 2);
+  }
+
+  // 離散フーリエ変換で利用していた
+  // 1のn乗根に相当する値を求める
+  static ModInt omega_like(ll n) {
+    assert((NTT_MOD - 1) % n == 0);
+    return ModInt(PRIMITIVE_ROOT).modpow((NTT_MOD - 1) / n);
+  }
+
+  friend std::ostream &operator<<(std::ostream &os, const ModInt &x) {
+    return os << x.val;
+  }
+
+  friend std::istream &operator>>(std::istream &is, ModInt &x) {
+    ll tmp;
+    is >> tmp;
+    x.val = x.normalize(tmp);
+    return is;
+  }
+
+  bool operator<(const ModInt &other) const {
+    return this->val < other.val;
+  }
+  bool operator<=(const ModInt &other) const {
+    return this->val <= other.val;
+  }
+  bool operator>(const ModInt &other) const {
+    return this->val > other.val;
+  }
+  bool operator>=(const ModInt &other) const {
+    return this->val >= other.val;
+  }
+  bool operator==(const ModInt &other) const {
+    return this->val == other.val;
+  }
+  bool operator!=(const ModInt &other) const {
+    return this->val != other.val;
+  }
+};
+
+/**
+ * 数論変換を利用して畳み込み（多項式の積もこれに該当）の結果を
+ * mod 998244353 で求めるクラス
+ * 時間計算量は2つの数列の長さをそれぞれm,nとする時
+ * N >= m+n-1 を満たす最小の2の冪乗である整数NについてO(NlogN)
+ */
+class ConvolutionSolver {
+private:
+  static constexpr ll MAX_DEPTH = 23;
+
+  inline static array<ModInt, MAX_DEPTH + 1> RN{};
+  inline static array<ModInt, MAX_DEPTH + 1> RN_INVERSE{};
+  inline static ModInt INVERSE_OF_2{};
+  inline static once_flag initialization_flag;
+
+  ConvolutionSolver() = delete;
+
+  // 最初の呼び出し時に一度だけ実行
+  static void initialize() {
+    call_once(initialization_flag, []() {
+      INVERSE_OF_2 = ModInt(2).inverse();
+
+      rep_closed(depth, 1, MAX_DEPTH) {
+        const ll order = 1LL << depth;
+
+        RN[depth] = ModInt::omega_like(order);
+        RN_INVERSE[depth] = RN[depth].inverse();
+      }
+    });
+  }
+
+  /**
+   * 高速フーリエ変換を実行する
+   * 第3引数をtrueとして呼び出すとフーリエ変換を行ってF(t)を求める
+   * 第3引数をfalseとして呼び出すと逆フーリエ変換を行ってf(x)を求める
+   */
+  static vector<ModInt> execute_fft(const vector<ModInt> &a, ll depth, bool is_forward) {
+    if (a.size() == 1) {
+      return {a[0]};
+    }
+
+    const ll N = a.size();
+    vector<ModInt> a_even(N / 2);
+    vector<ModInt> a_odd(N / 2);
+
+    rep(i, N) {
+      if (i % 2 == 0) {
+        a_even[i / 2] = a[i];
+      } else {
+        a_odd[i / 2] = a[i];
+      }
+    }
+
+    const vector<ModInt> b_even = execute_fft(a_even, depth - 1, is_forward);
+    const vector<ModInt> b_odd = execute_fft(a_odd, depth - 1, is_forward);
+
+    vector<ModInt> result(N);
+    ModInt root_power = 1;
+
+    if (is_forward) {
+      rep(i, N) {
+        result[i] = b_even[i % (N / 2)] + root_power * b_odd[i % (N / 2)];
+        root_power *= RN[depth];
+      }
+    } else {
+      rep(i, N) {
+        result[i] = (b_even[i % (N / 2)] + root_power * b_odd[i % (N / 2)]) * INVERSE_OF_2;
+        root_power *= RN_INVERSE[depth];
+      }
+    }
+
+    return result;
+  }
+
+public:
+  /**
+   * f(x) = a[0] + a[1]*x + ... + a[m-1]*x^{m-1}
+   * g(x) = b[0] + b[1]*x + ... + b[n-1]*x^{n-1}
+   * と表される整数係数の多項式f(x),g(x)の積にあたる
+   * h(x) = f(x)*g(x)の係数たちを求める（昇べきの順で返される）
+   */
+  static vector<ModInt> convolution(vector<ModInt> a, vector<ModInt> b) {
+    initialize();
+
+    if (a.empty() || b.empty()) {
+      return {};
+    }
+
+    const ll result_size = a.size() + b.size() - 1;
+
+    ll N = 1;
+    ll depth = 0;
+
+    while (N < result_size) {
+      N *= 2;
+      ++depth;
+    }
+
+    assert(depth <= MAX_DEPTH);
+
+    a.resize(N);
+    b.resize(N);
+
+    // f(x)およびg(x)をフーリエ変換する
+    vector<ModInt> A = execute_fft(a, depth, true);
+    vector<ModInt> B = execute_fft(b, depth, true);
+
+    // 積であるh(x)をフーリエ変換した結果にあたるH(t)の各係数を求める
+    vector<ModInt> C(N);
+    rep(i, N) {
+      C[i] = A[i] * B[i];
+    }
+
+    // H(t)を逆フーリエ変換してh(x)を求める
+    vector<ModInt> res = execute_fft(C, depth, false);
+
+    // NTT用の余分なゼロ埋め部分を取り除く
+    res.resize(result_size);
+    return res;
+  }
+};

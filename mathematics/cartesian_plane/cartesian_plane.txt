@@ -1,0 +1,63 @@
+// xy平面上の2点p1, p2（それぞれの座標は(x1,y1), (x2,y2)）を通る
+// 直線を表す方程式を一般形の ax + by + c = 0 で表す場合における
+// [a, b, c]の値をまとめて持つtupleを返す
+tuple<ll, ll, ll> line_coefficient(pair<ll, ll>& p1, pair<ll, ll>& p2) {
+  auto [x1, y1] = p1;
+  auto [x2, y2] = p2;
+
+  if (x1 == x2) {
+    return make_tuple(1, 0, -x1);
+  }
+
+  if (y1 == y2) {
+    return make_tuple(0, 1, -y1);
+  }
+
+  ll a = y2 - y1;
+  ll b = -1 * (x2 - x1);
+  ll c = x2 * y1 - x1 * y2;
+
+  // 最大公約数で割り、aを正の整数にして正規化
+  ll g = __gcd(abs(a), __gcd(abs(b), abs(c)));
+  a /= g;
+  b /= g;
+  c /= g;
+  if (a < 0) {
+    a *= -1;
+    b *= -1;
+    c *= -1;
+  }
+
+  return make_tuple(a, b, c);
+}
+
+// xy平面における始点と終点から変位ベクトルを求める
+pair<ll, ll> calc_displacement_vector(pair<ll, ll>& src, pair<ll, ll>& dest) {
+  pair<ll, ll> res;
+  res.first = dest.first - src.first;
+  res.second = dest.second - src.second;
+  return res;
+}
+
+// xy平面におけるベクトルの大きさの2乗を求める
+ll calc_squared_norm(pair<ll, ll>& v) {
+  ll res = 0;
+  res += power(v.first, 2);
+  res += power(v.second, 2);
+  return res;
+}
+
+// xy平面におけるベクトルの大きさを求める
+double calc_norm(pair<ll, ll>& v) {
+  ll dsq = calc_squared_norm(v);
+  return sqrt(dsq);
+}
+
+// xy平面におけるベクトルを正規化したものを求める
+pair<double, double> to_normalized_vector(pair<ll, ll>& v) {
+  double norm = calc_norm(v);
+  pair<double, double> res;
+  res.first = v.first / norm;
+  res.second = v.second / norm;
+  return res;
+}

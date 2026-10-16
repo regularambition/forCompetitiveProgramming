@@ -1,0 +1,81 @@
+/**
+ * 通常の行列の積を求める場合における
+ * 成分同士の積を足し算に、成分同士の和をmax演算に
+ * 置き換えた場合におけるトロピカル代数を適用して
+ * 行列累乗を行う
+ */
+ll mat_size = 2;
+vector<vector<ll>> matrix_product(vector<vector<ll>>& A, vector<vector<ll>>& B) {
+  vector<vector<ll>> res(mat_size, vector<ll>(mat_size, -INF64));
+  for (ll i = 0; i < mat_size; ++i) {
+    for (ll j = 0; j < mat_size; ++j) {
+      for (ll k = 0; k < mat_size; ++k) {
+        if (min(A[i][k], B[k][j]) != -INF64) {
+          chmax(res[i][j], A[i][k] + B[k][j]);
+        }
+      }
+    }
+  }
+  return res;
+}
+
+vector<vector<ll>> matrix_power(vector<vector<ll>>& A, ll n) {
+  vector<vector<ll>> res(mat_size, vector<ll>(mat_size, -INF64));
+  for (ll i = 0; i < mat_size; ++i) {
+    res[i][i] = 0;
+  }
+
+  vector<vector<ll>> base = A;
+  while (n > 0) {
+    if (n & 1) {
+      res = matrix_product(res, base);
+    }
+    base = matrix_product(base, base);
+    n >>= 1;
+  }
+  return res;
+}
+
+#########################################
+#########################################
+#########################################
+#########################################
+#########################################
+
+/**
+ * 通常の行列の積を求める場合における
+ * 成分同士の積を足し算に、成分同士の和をmin演算に
+ * 置き換えた場合におけるトロピカル代数を適用して
+ * 行列累乗を行う
+ */
+ll mat_size = 2;
+vector<vector<ll>> matrix_product(vector<vector<ll>>& A, vector<vector<ll>>& B) {
+  vector<vector<ll>> res(mat_size, vector<ll>(mat_size, INF64));
+  for (ll i = 0; i < mat_size; ++i) {
+    for (ll j = 0; j < mat_size; ++j) {
+      for (ll k = 0; k < mat_size; ++k) {
+        if (max(A[i][k], B[k][j]) != INF64) {
+          chmin(res[i][j], A[i][k] + B[k][j]);
+        }
+      }
+    }
+  }
+  return res;
+}
+
+vector<vector<ll>> matrix_power(vector<vector<ll>>& A, ll n) {
+  vector<vector<ll>> res(mat_size, vector<ll>(mat_size, INF64));
+  for (ll i = 0; i < mat_size; ++i) {
+    res[i][i] = 0;
+  }
+
+  vector<vector<ll>> base = A;
+  while (n > 0) {
+    if (n & 1) {
+      res = matrix_product(res, base);
+    }
+    base = matrix_product(base, base);
+    n >>= 1;
+  }
+  return res;
+}

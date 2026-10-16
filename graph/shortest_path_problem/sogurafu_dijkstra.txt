@@ -1,0 +1,52 @@
+// n頂点m辺の非負重み辺のみからなる疎グラフに対してダイクストラ法を使う
+ll n, m;
+// 第1要素は行き先の頂点、第2要素は辺の重み
+vector<vector<pair<ll, ll>>> edges_from;
+
+vector<ll> sogurafu_dijkstra(ll start) {
+  vector<ll> dist(n, INF64);
+  g_prique<pair<ll, ll>> que;
+  que.emplace(0, start);
+
+  while (!que.empty()) {
+    auto [preliminary_dist, u] = que.top();
+    que.pop();
+
+    if (!chmin(dist[u], preliminary_dist)) {
+      continue;
+    }
+
+    for (auto& [v, weight] : edges_from[u]) {
+      if (dist[u] + weight < dist[v]) {
+        que.emplace(dist[u] + weight, v);
+      }
+    }
+  }
+
+  return dist;
+}
+
+
+// いちいちグローバル変数にするのがだるいのでラムダ式バージョンも
+auto sogurafu_dijkstra = [&](ll start) {
+  vector<ll> dist(n, INF64);
+  g_prique<pair<ll, ll>> que;
+  que.emplace(0, start);
+
+  while (!que.empty()) {
+    auto [preliminary_dist, u] = que.top();
+    que.pop();
+
+    if (!chmin(dist[u], preliminary_dist)) {
+      continue;
+    }
+
+    for (auto &[v, weight] : edges_from[u]) {
+      if (dist[u] + weight < dist[v]) {
+        que.emplace(dist[u] + weight, v);
+      }
+    }
+  }
+
+  return dist;
+};

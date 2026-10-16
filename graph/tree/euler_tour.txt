@@ -1,0 +1,142 @@
+// 使用例
+// https://judge.yosupo.jp/submission/410008
+// https://atcoder.jp/contests/abc294/submissions/79981205
+
+/**
+ * 木（根の頂点番号は0）に対してオイラーツアーを
+ * 実行するのが有効な問題で利用するクラス
+ * インスタンス生成直後は辺を持たない状態でグラフが初期化される
+ * 
+ * dfsの行きがけ順に入場時刻を割り振ることで
+ * 任意の頂点について、ある頂点の部分木に属する頂点に振られた
+ * 入場時刻からなる集合は連続する整数となることを利用
+ * 
+ * ダブリング表を備えているためLCAを高速に求めることも可能
+ */
+class EulerTour {
+  static constexpr ll MAX_LEVEL = 20;
+  static constexpr ll ROOT_OF_TREE = 0;
+
+  ll n;
+  vector<vector<ll>> G;
+
+  // オイラーツアー実行時における入場時刻・退場時刻
+  vector<ll> nyujo, taijo;
+  // オイラーツアー実行時における入場時刻 -> 頂点番号
+  vector<ll> inv_nyujo;
+
+  vector<ll> depth;
+  // parent[v][i] := 頂点vから2^iだけ根の方向へ遡った頂点
+  vector<vector<ll>> parent;
+
+  // オイラーツアー処理の本体である補助関数
+  void dfs(ll &timer, ll u, ll pu = -1) {
+    if (pu != -1) {
+      depth[u] = depth[pu] + 1;
+      parent[u][0] = pu;
+    }
+
+    nyujo[u] = timer;
+    inv_nyujo[timer] = u;
+    ++timer;
+
+    for (ll v : G[u]) {
+      if (v != pu) {
+        dfs(timer, v, u);
+      }
+    }
+
+    taijo[u] = timer;
+  }
+
+  void complete_doubling_table() {
+    rep_closed(i, 1, MAX_LEVEL) {
+      rep(v, n) {
+        // 頂点vから2^iだけ根の方向へ遡った頂点は
+        // 頂点vから2^(i - 1)だけ遡った頂点をxとすれば
+        // 頂点xから2^(i - 1)だけ遡った頂点に同じ
+        const ll x = parent[v][i - 1];
+        parent[v][i] = parent[x][i - 1];
+      }
+    }
+  }
+
+public:
+  EulerTour(ll n_arg)
+      : n(n_arg), G(n), nyujo(n), taijo(n), inv_nyujo(n), depth(n), parent(n, vector<ll>(MAX_LEVEL + 1, ROOT_OF_TREE)) {
+  }
+
+  // 頂点uとvの間に辺を張る
+  void add_edge(ll u, ll v) {
+    G[u].push_back(v);
+    G[v].push_back(u);
+  }
+
+  /**
+   * オイラーツアーを実行する
+   * dfsの過程で全ての辺を根から遠ざかる向き・根に近づく向きに
+   * 一度ずつ遷移するため木の頂点数nに対し時間計算量はO(n)
+   * 同時に走るダブリング表の構築処理にO(nlogn)の時間がかかる
+   */
+  void resolve() {
+    ll timer = 0;
+    dfs(timer, ROOT_OF_TREE);
+    complete_doubling_table();
+  }
+
+  // 頂点番号を受け取ってオイラーツアー実行時の入場時刻を返す
+  ll entrance_time(ll v) {
+    return nyujo[v];
+  }
+
+  // 入場時刻を受け取ってその時に踏んだ頂点番号を返す
+  ll vertex_entered_at(ll jikoku) {
+    return inv_nyujo[jikoku];
+  }
+
+  // 頂点番号を受け取りそれを根とする部分木の頂点数を返す
+  ll subtree_size(ll v) {
+    return taijo[v] - nyujo[v];
+  }
+
+  /**
+   * 頂点番号を受け取り、オイラーツアー実行時において
+   * それを根とする部分木を探索中であった時刻の範囲を表す
+   * 半開区間[入場時刻,退場時刻)を返す
+   */
+  pair<ll, ll> subtree_time_range(ll v) {
+    return {nyujo[v], taijo[v]};
+  }
+
+  /**
+   * 2頂点u,vのLCAを求める
+   * 木の頂点数nに対して時間計算量はO(logn)
+   */
+  ll find_lca(ll u, ll v) {
+    if (depth[u] < depth[v]) {
+      swap(u, v);
+    }
+
+    ll delta = depth[u] - depth[v];
+    invrep(k, MAX_LEVEL + 1) {
+      if (kth_bit(delta, k)) {
+        u = parent[u][k];
+      }
+    }
+
+    if (u == v) {
+      return u;
+    }
+
+    invrep(k, MAX_LEVEL + 1) {
+      ll pu = parent[u][k];
+      ll pv = parent[v][k];
+      if (pu != pv) {
+        u = pu;
+        v = pv;
+      }
+    }
+
+    return parent[u][0];
+  }
+};

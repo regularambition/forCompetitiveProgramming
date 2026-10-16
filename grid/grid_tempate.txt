@@ -1,0 +1,34 @@
+// 長方形の盤面
+ll h, w;
+vector<string> grid;
+
+bool is_outside_of_grid(ll r, ll c) {
+  return r < 0 || h <= r || c < 0 || w <= c;
+}
+
+// ラムダ式版
+auto is_outside_of_grid = [&](ll r, ll c) { return r < 0 || h <= r || c < 0 || w <= c; };
+
+ll sequential_vertex_idx(ll r, ll c) {
+  return r * w + c;
+}
+
+pair<ll, ll> seq_to_row_col(ll seq) {
+  return { seq / w, seq % w };
+}
+
+// 正方形の盤面
+ll n;
+vector<string> grid;
+
+bool is_outside_of_grid(ll r, ll c) {
+  return r < 0 || n <= r || c < 0 || n <= c;
+}
+
+ll sequential_vertex_idx(ll r, ll c) {
+  return r * n + c;
+}
+
+pair<ll, ll> seq_to_row_col(ll seq) {
+  return { seq / n , seq % n };
+}

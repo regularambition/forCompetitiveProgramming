@@ -1,0 +1,109 @@
+/**
+ * Dinic法を利用して頂点数、辺数が
+ * それぞれV,Eの有向グラフに対する最大フローを求める
+ * 時間計算量は一般グラフの場合O(V^2 * E)
+ * 二部グラフのマッチング割り当て（容量ありなし問わず）の場合O(sqrt(V) * E)
+ * 辺容量が全て整数ならば最大フローをFとしてO(F * E)
+ * cf.) https://misawa.github.io/others/flow/dinic_time_complexity.html
+ */
+class Dinic {
+
+  struct Edge {
+    ll dest = -1;
+    ll remaining_hp = -1;
+    ll rev = -1;
+
+    Edge(ll dest, ll remaining_hp, ll rev) : dest(dest), remaining_hp(remaining_hp), rev(rev) {
+    }
+
+  private:
+    Edge() {
+    }
+  };
+
+  ll n, max_flow = 0;
+  vector<vector<Edge>> G;
+  // bfsで利用
+  vector<ll> dist;
+  // dfsで利用
+  vector<ll> iter;
+
+  void bfs(ll vs) {
+    fill(ALL(dist), INF64);
+    queue<ll> que;
+    dist[vs] = 0;
+    que.push(vs);
+
+    while (!que.empty()) {
+      ll u = que.front();
+      que.pop();
+
+      for (auto &[v, remaining_hp, rev] : G[u]) {
+        if (dist[v] == INF64 && remaining_hp > 0) {
+          dist[v] = dist[u] + 1;
+          que.push(v);
+        }
+      }
+    }
+  }
+
+  ll dfs(ll drain, ll v, ll bottleneck) {
+    if (v == drain) {
+      return bottleneck;
+    }
+
+    rep_closed(i, iter[v], (ll)G[v].size() - 1) {
+      iter[v] = i;
+      auto [nv, remaining_hp, rev] = G[v][i];
+      if (remaining_hp == 0 || dist[nv] != dist[v] + 1) {
+        continue;
+      }
+
+      ll tmp = dfs(drain, nv, min(bottleneck, remaining_hp));
+      if (tmp > 0) {
+        G[v][i].remaining_hp -= tmp;
+        // 逆辺の容量を増やす
+        G[nv][rev].remaining_hp += tmp;
+        return tmp;
+      }
+    }
+    return 0;
+  }
+
+  void maximize_flow(ll src, ll drain) {
+    while (true) {
+      bfs(src);
+      if (dist[drain] == INF64) {
+        break;
+      }
+
+      fill(ALL(iter), 0LL);
+
+      ll gain = 0;
+      do {
+        gain = dfs(drain, src, INF64);
+        max_flow += gain;
+      } while (gain > 0);
+    }
+  }
+
+public:
+  Dinic(ll n) {
+    this->n = n;
+    this->G.resize(n);
+    this->dist.resize(n);
+    this->iter.resize(n);
+  }
+
+  // fromからtoへ伸びる容量capacityの辺を追加
+  void add_edge(ll from, ll to, ll capacity) {
+    G[from].push_back(Edge(to, capacity, G[to].size()));
+    G[to].push_back(Edge(from, 0, G[from].size() - 1));
+  }
+
+  // srcからdrainへ水を流す時の最大フローを求める
+  ll find_max_flow(ll src, ll drain) {
+    maximize_flow(src, drain);
+    return max_flow;
+  }
+};

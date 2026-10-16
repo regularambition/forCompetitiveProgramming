@@ -1,0 +1,18 @@
+/**
+ * ワーシャルフロイド法を実行して
+ * 任意の2頂点間の最短距離を記録する
+ * 時間計算量は頂点数nに対してO(n^3)
+ */
+void washarufuroido(vector<vector<ll>>& dist) {
+  const ll n = dist.size();
+  rep(i, n) {
+    dist[i][i] = 0;
+  }
+  rep(k, n) {
+    rep(i, n) {
+      rep(j, n) {
+        chmin(dist[i][j], dist[i][k] + dist[k][j]);
+      }
+    }
+  }
+}

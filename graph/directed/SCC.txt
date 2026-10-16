@@ -1,0 +1,130 @@
+/**
+ * 有向グラフに対して強連結成分分解を行うクラス
+ */
+class SccResolver {
+  ll n;
+  vector<vector<ll>> edges_from, tenchi_edges_from;
+  vector<bool> has_visited;
+  vector<ll> root_of_scc;
+  vector<vector<ll>> vertices_on_same_scc;
+  ll n_scc = 0;
+  vector<ll> vertex_on_compressed_dag;
+
+  void dfs_impl(ll v, vector<ll> &trace, bool is_backtracking) {
+    has_visited[v] = true;
+    if (!is_backtracking) {
+      trace.push_back(v);
+    }
+
+    const auto &G = is_backtracking ? edges_from : tenchi_edges_from;
+    for (ll nv : G[v]) {
+      if (!has_visited[nv]) {
+        dfs_impl(nv, trace, is_backtracking);
+      }
+    }
+
+    if (is_backtracking) {
+      trace.push_back(v);
+    }
+  }
+
+  void dfs(ll vstart, vector<ll> &trace) {
+    dfs_impl(vstart, trace, true);
+  }
+
+  void tenchi_dfs(ll vstart, vector<ll> &vec) {
+    dfs_impl(vstart, vec, false);
+  }
+
+public:
+  SccResolver(ll n_arg) {
+    n = n_arg;
+    edges_from.resize(n);
+    tenchi_edges_from.resize(n);
+    has_visited.resize(n, false);
+    root_of_scc.resize(n, -1);
+    vertices_on_same_scc.resize(n);
+    vertex_on_compressed_dag.resize(n, -1);
+  };
+
+  void add_edge(ll src, ll dest) {
+    edges_from[src].push_back(dest);
+    tenchi_edges_from[dest].push_back(src);
+  }
+
+  /**
+   * 頂点数n・辺の数mの有向グラフに対して強連結成分分解を実行
+   * 実行時間はO(n+m)と見積もられる
+   * 同じインスタンスに対して一度しか呼び出さないようにする
+   */
+  void resolve() {
+    vector<ll> trace;
+    rep(v, n) {
+      if (!has_visited[v]) {
+        dfs(v, trace);
+      }
+    }
+    assert(n == (ll)trace.size());
+
+    fill(ALL(has_visited), false);
+    invrep(i, n) {
+      ll v = trace[i];
+      if (!has_visited[v]) {
+        vector<ll> vec;
+        tenchi_dfs(v, vec);
+
+        for (ll &e : vec) {
+          root_of_scc[e] = v;
+        }
+        vertices_on_same_scc[v] = vec;
+        vertex_on_compressed_dag[v] = n_scc;
+        ++n_scc;
+      }
+    }
+  }
+
+  /**
+   * 元のグラフにおける頂点vが属するSCCの代表頂点を返す
+   */
+  ll root(ll v) {
+    return root_of_scc[v];
+  }
+
+  /**
+   * 元のグラフにおける頂点uとvが同じSCCに属するならばtrue
+   * そうでなければfalseを返す
+   */
+  bool issame(ll u, ll v) {
+    return root(u) == root(v);
+  }
+
+  /**
+   * 元のグラフにおける頂点vが属するSCCの頂点一覧を返す
+   */
+  vector<ll> list_scc_vertices(ll v) {
+    return vertices_on_same_scc[root(v)];
+  }
+
+  /**
+   * 元のグラフにおける頂点vが属するSCCの頂点数を返す
+   */
+  ll size_of_scc(ll v) {
+    return list_scc_vertices(v).size();
+  }
+
+  /**
+   * 元のグラフに存在するSCCの個数を返す
+   */
+  ll number_of_scc() {
+    return n_scc;
+  }
+
+  /**
+   * 元のグラフにおける頂点vの属するSCCの代表頂点が対応している
+   * SCCを縮約して出来上がったDAGにおける頂点番号を返す
+   */
+  ll find_vertex_on_compressed_dag(ll v) {
+    assert(vertex_on_compressed_dag[root(v)] != -1);
+    return vertex_on_compressed_dag[root(v)];
+  }
+};

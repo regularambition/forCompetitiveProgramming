@@ -1,0 +1,71 @@
+/**
+ * DAGの頂点番号に対するトポロジカル順序を求めるクラス
+ */
+class TopologicalSortExecutor {
+  ll n;
+  vector<vector<ll>> dag;
+  vector<ll> indegree;
+
+  template <class Container, class Peek> vector<ll> line_up_vertices_impl(Container container, Peek peek) {
+    vector<ll> res(n);
+    rep(v, n) {
+      if (indegree[v] == 0) {
+        container.push(v);
+      }
+    }
+
+    ll cursor = 0;
+    while (!container.empty()) {
+      ll v = peek(container);
+      container.pop();
+      res[cursor] = v;
+      ++cursor;
+
+      for (ll &nv : dag[v]) {
+        --indegree[nv];
+        if (indegree[nv] == 0) {
+          container.push(nv);
+        }
+      }
+    }
+
+    if (cursor != n) {
+      res.clear();
+    }
+
+    return res;
+  }
+
+public:
+  TopologicalSortExecutor(ll n_arg) {
+    n = n_arg;
+    dag.resize(n);
+    indegree.resize(n, 0LL);
+  }
+
+  void add_edge(ll src, ll dest) {
+    dag[src].push_back(dest);
+    ++indegree[dest];
+  }
+
+  /**
+   * Kahnのアルゴリズムを利用してトポロジカルソートを実行する
+   * 全ての頂点と辺を一度ずつ見るためn頂点m辺のDAGに対して
+   * 時間計算量はO(n+m)となる
+   * グラフがDAGではない場合は空列を返す
+   * 同じインスタンスに対して一度しか呼び出さないようにする
+   */
+  vector<ll> line_up_vertices() {
+    return line_up_vertices_impl(queue<ll>{}, [](const auto &que) { return que.front(); });
+  }
+
+  /**
+   * Kahnのアルゴリズムを利用してトポロジカルソートを実行し
+   * 辞書順で最小となる結果（グラフがDAGではない場合は空列）を返す
+   * n頂点m辺のDAGに対して時間計算量はO(n*logn + m)
+   * 同じインスタンスに対して一度しか呼び出さないようにする
+   */
+  vector<ll> line_up_vertices_lex_min() {
+    return line_up_vertices_impl(g_prique<ll>{}, [](const auto &pque) { return pque.top(); });
+  }
+};

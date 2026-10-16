@@ -1,0 +1,74 @@
+/**
+ * Miller-Rabinの素数判定法により素数判定を行う
+ * 素数ならばtrue、それ以外ならばfalseを返す
+ * 時間計算量はO(logn)
+ * 
+ * [verification]
+ * https://judge.yosupo.jp/submission/410519
+ * https://atcoder.jp/contests/awc0121/submissions/80050663
+ */
+bool miller_rabin_test(ll n) {
+  if (n < 2) {
+    return false;
+  }
+  if (n == 2) {
+    return true;
+  }
+  if (n % 2 == 0) {
+    return false;
+  }
+
+  ll shisu = 0;
+  ll d = n - 1;
+  while (d % 2 == 0) {
+    ++shisu;
+    d /= 2;
+  }
+
+  // base^d mod n を求める
+  auto func = [&](__int128_t base) {
+    __int128_t res = 1;
+    ll rem_shisu = d;
+    while (rem_shisu > 0) {
+      if (rem_shisu & 1) {
+        res *= base;
+        res %= n;
+      }
+      base *= base;
+      base %= n;
+      rem_shisu >>= 1;
+    }
+    return res;
+  };
+
+  auto test_inner = [&](ll a) {
+    __int128_t A = func(a);
+    if (A == 1) {
+      return true;
+    }
+
+    rep(x, shisu) {
+      if (A == n - 1) {
+        return true;
+      }
+
+      A *= A;
+      A %= n;
+    }
+    return false;
+  };
+
+  vector<ll> vec{2LL, 325LL, 9375LL, 28178LL, 450775LL, 9780504LL, 1795265022LL};
+
+  for (ll a : vec) {
+    a %= n;
+    if (a == 0) {
+      continue;
+    }
+
+    if (!test_inner(a)) {
+      return false;
+    }
+  }
+  return true;
+}

@@ -1,0 +1,323 @@
+// SA-ISを利用してsuffix arrayを構築する
+// 時間計算量・空間計算量ともにO(|s|)
+// sの末尾には番兵'$'を追加していることを前提とする
+// 
+// [reference]
+// https://trap.jp/post/953/
+// https://shogo82148.github.io/homepage/memo/algorithm/suffix-array/
+// [verification]
+// https://judge.yosupo.jp/submission/337233
+class SuffixArrayBuilder {
+
+  const static ll DEFAULT_SIGMA = 130;
+
+  SuffixArrayBuilder() = default;
+
+  static vector<bool> detect_S_or_L(vector<ll>& s) {
+    ll len = s.size();
+    vector<bool> is_s_type(len, true);
+    for (ll i = len - 2; i >= 0; --i) {
+      if (s[i] < s[i + 1]) {
+        is_s_type[i] = true;
+      } else if (s[i] > s[i + 1]) {
+        is_s_type[i] = false;
+      } else {
+        is_s_type[i] = is_s_type[i + 1];
+      }
+    }
+    return is_s_type;
+  }
+
+  static bool is_lms_index(ll idx, vector<bool>& is_s_type) {
+    return idx >= 1 && is_s_type[idx] && !is_s_type[idx - 1];
+  }
+
+  static vector<ll> list_LMS_indices(vector<ll>& s, vector<bool>& is_s_type) {
+    vector<ll> res;
+    ll len = s.size();
+    for (ll i = 1; i < len; ++i) {
+      if (is_lms_index(i, is_s_type)) {
+        res.push_back(i);
+      }
+    }
+    return res;
+  }
+
+  static vector<ll> list_bucket_sizes(vector<ll>& s, ll sigma) {
+    vector<ll> res(sigma, 0);
+    for (ll& ch : s) {
+      ++res[ch];
+    }
+    return res;
+  }
+
+  static vector<ll> get_acc_bucket_sizes(vector<ll>& bucket_sizes, ll sigma) {
+    vector<ll> res(sigma, 0);
+    for (ll i = 1; i < sigma; ++i) {
+      res[i] += res[i - 1] + bucket_sizes[i - 1];
+    }
+    return res;
+  }
+
+  static void reset_bucket_head(vector<ll>& bucket_head) {
+    fill(ALL(bucket_head), 0);
+  }
+
+  static void reset_bucket_tail(vector<pair<ll, ll>>& bucket_tail, ll sigma) {
+    for (ll i = 0; i < sigma; ++i) {
+      bucket_tail[i].first = bucket_tail[i].second;
+    }
+  }
+
+  static void erase_lms_indices(vector<ll>& res_SA, vector<ll>& s, vector<bool>& is_s_type) {
+    ll len = s.size();
+    for (ll i = 0; i < len; ++i) {
+      if (res_SA[i] == -1) {
+        continue;
+      }
+
+      ll j = res_SA[i];
+      if (j != len - 1 && is_lms_index(j, is_s_type)) {
+        res_SA[i] = -1;
+      }
+    }
+  }
+
+  static void induce_L(vector<ll>& res_SA, vector<ll>& s, vector<bool>& is_s_type, vector<ll>& acc_bucket_sizes, vector<ll>& bucket_head) {
+    ll len = s.size();
+    reset_bucket_head(bucket_head);
+
+    for (ll i = 0; i < len; ++i) {
+      if (res_SA[i] == -1) {
+        continue;
+      }
+
+      ll j = res_SA[i] - 1;
+      if (j >= 0 && !is_s_type[j]) {
+        ll ch = s[j];
+        res_SA[acc_bucket_sizes[ch] + bucket_head[ch]] = j;
+        ++bucket_head[ch];
+      }
+    }
+  }
+
+  static void induce_S(vector<ll>& res_SA, vector<ll>& s, vector<bool>& is_s_type, vector<ll>& acc_bucket_sizes, vector<pair<ll, ll>>& bucket_tail, ll sigma) {
+    ll len = s.size();
+    reset_bucket_tail(bucket_tail, sigma);
+
+    for (ll i = len - 1; i >= 0; --i) {
+      if (res_SA[i] == -1) {
+        continue;
+      }
+
+      ll j = res_SA[i] - 1;
+      if (j >= 0 && is_s_type[j]) {
+        ll ch = s[j];
+        --bucket_tail[ch].first;
+        res_SA[acc_bucket_sizes[ch] + bucket_tail[ch].first] = j;
+      }
+    }
+  }
+
+  static bool equal_lms(vector<ll>& s, vector<bool>& is_s_type, ll i, ll j) {
+    ll len = s.size();
+
+    ll diff = 0;
+    while (max(i + diff, j + diff) < len) {
+      if (s[i + diff] != s[j + diff]) {
+        return false;
+      }
+
+      bool i_is_lms = is_lms_index(i + diff, is_s_type);
+      bool j_is_lms = is_lms_index(j + diff, is_s_type);
+      if (!i_is_lms && !j_is_lms) {
+      } else if (i_is_lms ^ j_is_lms) {
+        return false;
+      } else if (diff != 0) {
+        break;
+      }
+      ++diff;
+    }
+    return true;
+  }
+
+  static vector<ll> execute_SAIS(vector<ll>& s, ll sigma = DEFAULT_SIGMA) {
+    ll len = s.size();
+    if (len == 1) {
+      return { 0 };
+    }
+
+    vector<bool> is_s_type = detect_S_or_L(s);
+    vector<ll> lms_positions = list_LMS_indices(s, is_s_type);
+    vector<ll> bucket_sizes = list_bucket_sizes(s, sigma);
+    vector<ll> acc_bucket_sizes = get_acc_bucket_sizes(bucket_sizes, sigma);
+    vector<ll> bucket_head(sigma, 0);
+    vector<pair<ll, ll>> bucket_tail(sigma, { 0,0 });
+    for (ll i = 0; i < sigma; ++i) {
+      bucket_tail[i] = { bucket_sizes[i],bucket_sizes[i] };
+    }
+
+    vector<ll> res_SA(len, -1);
+    for (ll pos : lms_positions) {
+      ll ch = s[pos];
+      --bucket_tail[ch].first;
+      res_SA[acc_bucket_sizes[ch] + bucket_tail[ch].first] = pos;
+    }
+
+    induce_L(res_SA, s, is_s_type, acc_bucket_sizes, bucket_head);
+    erase_lms_indices(res_SA, s, is_s_type);
+    induce_S(res_SA, s, is_s_type, acc_bucket_sizes, bucket_tail, sigma);
+
+    vector<ll> lms_ranks(len, -1);
+    ll name = 0, prv_lms_idx = -1;
+    for (ll i : res_SA) {
+      if (is_lms_index(i, is_s_type)) {
+        bool found_new_lms_substr = false;
+        if (prv_lms_idx == -1 || !equal_lms(s, is_s_type, prv_lms_idx, i)) {
+          found_new_lms_substr = true;
+        }
+        name += found_new_lms_substr;
+        lms_ranks[i] = name;
+        prv_lms_idx = i;
+      }
+    }
+
+    vector<ll> lms_str;
+    for (ll i : lms_positions) {
+      lms_str.push_back(lms_ranks[i]);
+    }
+    lms_str.push_back(0);
+
+    ll m = lms_str.size();
+    vector<ll> sorted_lms_positions = lms_positions;
+    if (name + 1 < m) {
+      vector<ll> reduced_SA = execute_SAIS(lms_str, name + 1);
+
+      for (ll i = 1; i < m; ++i) {
+        sorted_lms_positions[i - 1] = lms_positions[reduced_SA[i]];
+      }
+    } else {
+      for (ll i = 0; lms_str[i] != 0; ++i) {
+        ll j = lms_str[i] - 1;
+        sorted_lms_positions[j] = lms_positions[i];
+      }
+    }
+
+    fill(ALL(res_SA), -1);
+
+    reset_bucket_tail(bucket_tail, sigma);
+    for (auto itr = sorted_lms_positions.rbegin(); itr != sorted_lms_positions.rend(); ++itr) {
+      ll pos = *itr;
+      ll ch = s[pos];
+      --bucket_tail[ch].first;
+      res_SA[acc_bucket_sizes[ch] + bucket_tail[ch].first] = pos;
+    }
+
+    induce_L(res_SA, s, is_s_type, acc_bucket_sizes, bucket_head);
+    erase_lms_indices(res_SA, s, is_s_type);
+    induce_S(res_SA, s, is_s_type, acc_bucket_sizes, bucket_tail, sigma);
+
+    return res_SA;
+  }
+
+public:
+  static vector<ll> build(string& s) {
+    vector<ll> s_vec;
+    for (char& ch : s) {
+      s_vec.push_back(ch);
+    }
+    s_vec.push_back('$');
+    return execute_SAIS(s_vec);
+  }
+
+};
+
+// s.substr(i, t.length())が
+// tよりも辞書順で真に大きければtrue、それ以外はfalseを返す
+bool is_prefix_of_suffix_greater(string& s, ll i, string& t) {
+  ll j = 0;
+  while (s[i + j] != '\0' && t[j] != '\0') {
+    if (s[i + j] == t[j]) {
+      ++j;
+    } else {
+      return s[i + j] > t[j];
+    }
+  }
+
+  return false;
+}
+
+// s.substr(i, t.length())が
+// tよりも辞書順で真に大きいまたは
+// tと等しければtrue、それ以外はfalseを返す
+bool is_prefix_of_suffix_geq(string& s, ll i, string& t) {
+  ll j = 0;
+  while (s[i + j] != '\0' && t[j] != '\0') {
+    if (s[i + j] == t[j]) {
+      ++j;
+    } else {
+      return s[i + j] >= t[j];
+    }
+  }
+
+  return t[j] == '\0';
+}
+
+
+// LCP arrayを利用して最長共通部分文字列を求める処理の例
+// https://judge.yosupo.jp/submission/337773
+
+// 構築済みのsuffix arrayを利用してLCP arrayを構築する
+// 時間計算量・空間計算量ともにO(|s|)
+// lcp_arr[i]に格納されている値が意味しているのは
+// 辞書順でi番目および(i+1)番目に小さい接尾辞が共通して持つ接頭辞の長さ
+// 
+// [reference]
+// https://www.nct9.ne.jp/m_hiroi/light/pyalgo60.html
+class LcpArrayBuilder {
+
+  static vector<ll> build_SA_inverse(vector<ll>& sa) {
+    vector<ll> res = sa;
+    const ll len = sa.size();
+    for (ll i = 0; i < len; ++i) {
+      res[sa[i]] = i;
+    }
+    return res;
+  }
+
+  static ll lcp_length(string& s, ll i, ll j) {
+    ll res = 0;
+    while (s[max(i + res, j + res)] != '\0') {
+      if (s[i + res] == s[j + res]) {
+        ++res;
+      } else {
+        break;
+      }
+    }
+    return res;
+  }
+
+public:
+  static vector<ll> build(string& s, vector<ll>& sa) {
+    vector<ll> sa_inverse = build_SA_inverse(sa);
+    vector<ll> res(sa.size(), 0);
+    ll h = 0;
+    for (ll i = 0; s[i] != '\0'; ++i) {
+      ll j = sa_inverse[i];
+      if (s[j] == '\0') {
+        res[j] = h = 0;
+        continue;
+      }
+
+      ll k = sa[j + 1];
+      if (h == 0) {
+        h = lcp_length(s, i, k);
+      } else {
+        h = h - 1 + lcp_length(s, i + h - 1, k + h - 1);
+      }
+      res[j] = h;
+    }
+    return res;
+  }
+
+};

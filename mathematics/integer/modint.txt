@@ -1,0 +1,151 @@
+/**
+ * 「答えを mod P で求めよ」という形式の問題で利用するクラス
+ * 法の値には2^31以下であるような自然数のみ利用可能
+ */
+template <ll MOD = 998244353> class ModInt {
+private:
+  static const ll MAX_VALID_MOD = 1LL << 31LL;
+
+  ll val;
+
+  ll normalize(ll x) const {
+    x %= MOD;
+    if (x < 0) {
+      x += MOD;
+    }
+    return x;
+  }
+
+  void assert_same_mod(const ModInt &other) const {
+    assert(get_mod() == other.get_mod());
+  }
+
+public:
+  ModInt(ll x = 0) : val(normalize(x)) {
+    assert(0 < MOD && MOD <= MAX_VALID_MOD);
+  }
+
+  ModInt(string &s) {
+    val = 0;
+    for (char &ch : s) {
+      val *= 10;
+      val += ch - '0';
+      val = normalize(val);
+    }
+  }
+
+  ll get_val() const {
+    return val;
+  }
+
+  ll get_mod() const {
+    return MOD;
+  }
+
+  ModInt &operator+=(const ModInt &other) {
+    assert_same_mod(other);
+    val = normalize(val + other.val);
+    return *this;
+  }
+  ModInt &operator-=(const ModInt &other) {
+    assert_same_mod(other);
+    val = normalize(val - other.val);
+    return *this;
+  }
+  ModInt &operator*=(const ModInt &other) {
+    assert_same_mod(other);
+    val = normalize(val * other.val);
+    return *this;
+  }
+  ModInt &operator/=(const ModInt &other) {
+    assert_same_mod(other);
+    return *this *= other.inverse();
+  }
+
+  ModInt operator+(const ModInt &other) const {
+    ModInt result = *this;
+    return result += other;
+  }
+  ModInt operator-(const ModInt &other) const {
+    ModInt result = *this;
+    return result -= other;
+  }
+  ModInt operator*(const ModInt &other) const {
+    ModInt result = *this;
+    return result *= other;
+  }
+  ModInt operator/(const ModInt &other) const {
+    ModInt result = *this;
+    return result /= other;
+  }
+
+  ModInt modpow(ll n) const {
+    assert(n >= 0);
+
+    ModInt<MOD> res = 1, base = *this;
+    while (n > 0) {
+      if (n & 1) {
+        res *= base;
+      }
+      base *= base;
+      n >>= 1;
+    }
+
+    assert_same_mod(res);
+    return res;
+  }
+
+  ModInt inverse() const {
+    ll a = val, b = MOD, u = 1, v = 0;
+    while (b) {
+      ll t = a / b;
+      a -= t * b;
+      swap(a, b);
+      u -= t * v;
+      swap(u, v);
+    }
+
+    // 逆元が存在するのは法と互いに素な整数だけ
+    assert(a == 1);
+
+    ModInt<MOD> res = u;
+    assert_same_mod(res);
+    return res;
+  }
+
+  friend std::ostream &operator<<(std::ostream &os, const ModInt &x) {
+    return os << x.val;
+  }
+
+  friend std::istream &operator>>(std::istream &is, ModInt &x) {
+    ll tmp;
+    is >> tmp;
+    x.val = x.normalize(tmp);
+    return is;
+  }
+
+  bool operator<(const ModInt &other) const {
+    assert_same_mod(other);
+    return this->val < other.val;
+  }
+  bool operator<=(const ModInt &other) const {
+    assert_same_mod(other);
+    return this->val <= other.val;
+  }
+  bool operator>(const ModInt &other) const {
+    assert_same_mod(other);
+    return this->val > other.val;
+  }
+  bool operator>=(const ModInt &other) const {
+    assert_same_mod(other);
+    return this->val >= other.val;
+  }
+  bool operator==(const ModInt &other) const {
+    assert_same_mod(other);
+    return this->val == other.val;
+  }
+  bool operator!=(const ModInt &other) const {
+    assert_same_mod(other);
+    return this->val != other.val;
+  }
+};

@@ -1,0 +1,146 @@
+/**
+ * Hopcroft-Karp Algorithmを利用して二部グラフの最大マッチングを高速に求める
+ * 頂点・辺の数がそれぞれV,Eに対し時間計算量O(sqrt(V)*E)
+ * 左側の頂点群は半開区間[0,ls)に属する番号が、
+ * 右側の頂点群は半開区間[ls,ls + rs)に属する番号が与えられている
+ *
+ * 例えばN人がそれぞれ2つのうちどちらかの値を獲得する状況に対し
+ * 全員が値を獲得した時点において現れている値は
+ * 最大で何種類あるかといった問題に対して有効
+ */
+class HopcroftKarp {
+  ll ls, rs;
+  vector<ll> partner_of, dist;
+  vector<bool> has_visited;
+  vector<vector<ll>> edges_from;
+
+  vector<vector<ll>> build_directed_graph() {
+    vector<vector<ll>> res(ls + rs);
+
+    for (ll i = 0; i < ls; ++i) {
+      for (ll ridx : edges_from[i]) {
+        if (partner_of[i] != ridx) {
+          res[i].push_back(ridx);
+        }
+      }
+    }
+
+    for (ll i = ls; i < ls + rs; ++i) {
+      if (partner_of[i] != -1) {
+        res[i].push_back(partner_of[i]);
+      }
+    }
+
+    return res;
+  }
+
+  vector<vector<ll>> bfs() {
+    vector<vector<ll>> directed_edges_from = build_directed_graph();
+
+    queue<ll> que;
+    fill(ALL(dist), -1);
+    for (ll i = 0; i < ls; ++i) {
+      if (partner_of[i] == -1) {
+        que.push(i);
+        dist[i] = 0;
+      }
+    }
+
+    vector<vector<ll>> dag_transposed(ls + rs);
+    while (!que.empty()) {
+      ll qf = que.front();
+      que.pop();
+
+      for (ll nv : directed_edges_from[qf]) {
+        dag_transposed[nv].push_back(qf);
+
+        if (dist[nv] == -1) {
+          dist[nv] = dist[qf] + 1;
+          que.push(nv);
+        }
+      }
+    }
+
+    return dag_transposed;
+  }
+
+  bool dfs(ll cv, vector<vector<ll>>& dag_transposed, vector<ll>& trace) {
+    has_visited[cv] = true;
+    trace.push_back(cv);
+
+    if (dist[cv] == 0) {
+      for (ll i = trace.size() - 1; i >= 1; --i) {
+        if (dist[trace[i]] & 1) {
+        } else {
+          partner_of[trace[i]] = trace[i - 1];
+          partner_of[trace[i - 1]] = trace[i];
+        }
+      }
+
+      trace.clear();
+      return true;
+    }
+
+    for (ll nv : dag_transposed[cv]) {
+      if (has_visited[nv]) {
+        continue;
+      }
+
+      if (dfs(nv, dag_transposed, trace)) {
+        return true;
+      }
+    }
+
+    trace.pop_back();
+    return false;
+  }
+
+  void maximize_matching() {
+    bool need_iteration = true;
+    while (need_iteration) {
+      vector<vector<ll>> dag_transposed = bfs();
+      vector<ll> trace;
+
+      fill(ALL(has_visited), false);
+      need_iteration = false;
+      for (ll i = ls; i < ls + rs; ++i) {
+        if (partner_of[i] == -1) {
+          need_iteration |= dfs(i, dag_transposed, trace);
+        }
+      }
+    }
+  }
+
+public:
+  HopcroftKarp(ll ls, ll rs) {
+    this->ls = ls;
+    this->rs = rs;
+    partner_of.resize(ls + rs, -1);
+    dist.resize(ls + rs, -1);
+    has_visited.resize(ls + rs, false);
+    edges_from.resize(ls + rs);
+  }
+
+  /**
+   * 内部的に保持する無向グラフについて
+   * 左側群に属する番号lvの頂点と
+   * 右側群に属する番号rvの頂点との間に辺を張る
+   */
+  void add_undirected_edge(ll lv, ll rv) {
+    edges_from[lv].push_back(rv);
+    edges_from[rv].push_back(lv);
+  }
+
+  /**
+   * 最大マッチングを実現した場合のマッチング辺数を返す
+   */
+  ll find_max_matching() {
+    maximize_matching();
+
+    ll res = 0;
+    for (ll i = 0; i < ls; ++i) {
+      res += (partner_of[i] != -1);
+    }
+    return res;
+  }
+};

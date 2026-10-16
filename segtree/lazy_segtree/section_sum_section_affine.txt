@@ -1,0 +1,53 @@
+template <class seisu> struct SectionSum {
+  seisu total;
+  seisu len;
+
+  SectionSum(seisu t, seisu l) : total(t), len(l) {
+  }
+};
+
+template <class seisu> struct Affine {
+  seisu a;
+  seisu b;
+
+  Affine(seisu a_arg, seisu b_arg) : a(a_arg), b(b_arg) {
+  }
+};
+
+/**
+ * 遅延セグメント木が以下の要件を満たす場合に使う関数定義
+ * 実配列・遅延作用素ともに整数を扱う
+ * 実配列が保持する情報：区間和
+ * 遅延作用素：区間に対して一律でアフィン変換
+ */
+template <class seisu> struct ActionsForSectionSumSectionAffine {
+  SectionSum<seisu> biop(const SectionSum<seisu> &d1, const SectionSum<seisu> &d2) const {
+    return SectionSum<seisu>(d1.total + d2.total, d1.len + d2.len);
+  }
+
+  SectionSum<seisu> id_element() const {
+    return SectionSum<seisu>(0, 0);
+  }
+
+  SectionSum<seisu> mapping(const SectionSum<seisu> &d, const Affine<seisu> &f) const {
+    auto [a, b] = f;
+    return SectionSum<seisu>(a * d.total + b * d.len, d.len);
+  }
+
+  Affine<seisu> composition(const Affine<seisu> &f, const Affine<seisu> &g) const {
+    auto [a, b] = g;
+    auto [p, q] = f;
+
+    seisu u = p * a;
+    seisu v = p * b + q;
+
+    return Affine<seisu>(u, v);
+  }
+
+  Affine<seisu> id_mapping() const {
+    return Affine<seisu>(1, 0);
+  }
+};
+
+template <class seisu>
+using SegmentTree = LazySegTree<SectionSum<seisu>, Affine<seisu>, ActionsForSectionSumSectionAffine<seisu>>;

@@ -1,0 +1,110 @@
+class Trie {
+private:
+  class Node {
+  public:
+    char character;
+    vector<ll> child_node_indices;
+
+    // このノードを末尾とする部分文字列を接頭辞として持つ文字列の添字
+    vector<ll> prefix_str_indices;
+    // このノードを末尾とする文字列と完全に一致する文字列の添字
+    vector<ll> tail_str_indices;
+
+    Node(char ch_arg, ll str_idx = -1) {
+      this->character = ch_arg;
+      if (str_idx != -1) {
+        this->prefix_str_indices.push_back(str_idx);
+      }
+    }
+  };
+
+  const Node root = Node('@');
+  vector<Node> trie_nodes{ root };
+
+  void debug_nodes() {
+    if (cannot_use_debug) {
+      return;
+    }
+
+    for (szt i = 0; i < trie_nodes.size(); ++i) {
+      auto nd = trie_nodes[i];
+      debug_shikiri();
+      cout << "### node index = " << i << " ###" << endl;
+      cout << "character = " << nd.character << endl;
+      cout << "child_node_indices: ";
+      print_vector(nd.child_node_indices);
+      cout << "prefix_str_indices: ";
+      print_vector(nd.prefix_str_indices);
+      cout << "tail_str_indices: ";
+      print_vector(nd.tail_str_indices);
+    }
+  }
+
+public:
+  void insert(string str, ll str_idx = -1) {
+    ll node_index = 0;
+    ll head_str_index = -1;
+    for (ll i = 0; str[i] != '\0'; ++i) {
+      if (str_idx != -1 && node_index != 0) {
+        trie_nodes[node_index].prefix_str_indices.push_back(str_idx);
+      }
+
+      ll child_index = -1;
+      for (ll cni : trie_nodes[node_index].child_node_indices) {
+        if (trie_nodes[cni].character == str[i]) {
+          child_index = cni;
+          break;
+        }
+      }
+
+      if (child_index == -1) {
+        head_str_index = i;
+        break;
+      } else {
+        node_index = child_index;
+      }
+    }
+
+    if (head_str_index != -1) {
+      for (ll i = head_str_index; str[i] != '\0'; ++i) {
+        trie_nodes[node_index].child_node_indices.push_back(trie_nodes.size());
+        node_index = trie_nodes.size();
+        trie_nodes.push_back(Node(str[i], str_idx));
+      }
+    } else if (str_idx != -1) {
+      trie_nodes[node_index].prefix_str_indices.push_back(str_idx);
+    }
+
+    if (str_idx != -1) {
+      trie_nodes[node_index].tail_str_indices.push_back(str_idx);
+    }
+
+    debug_nodes();
+  }
+
+  // Trie木の中にstrと完全に一致する文字列が登録されている場合true
+  // 登録されていない場合はfalse
+  bool contains(string str) {
+    ll node_index = 0;
+    for (char ch : str) {
+      ll child_index = -1;
+      for (ll cni : trie_nodes[node_index].child_node_indices) {
+        if (trie_nodes[cni].character == ch) {
+          child_index = cni;
+          break;
+        }
+      }
+
+      if (child_index == -1) {
+        return false;
+      }
+
+      node_index = child_index;
+    }
+
+    return !trie_nodes[node_index].tail_str_indices.empty();
+  }
+};
+
+// ある数列の末尾に対して与えられた一つの値を追加した数列を新しく作る場合の応用例
+// https://atcoder.jp/contests/abc437/submissions/71882444

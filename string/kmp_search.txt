@@ -1,0 +1,53 @@
+/**
+ * KMP法の事前処理
+ * 特定パターンの各文字の位置で一致しなかった場合における
+ * 失敗関数の値を保持したリストを返す
+ * 時間計算量O(|t|)
+ */
+vector<ll> build_failures(const string &t) {
+  const ll tlen = t.length();
+  vector<ll> res(tlen);
+  ll j = 0;
+  for (ll i = 1; i < tlen; ++i) {
+    while (j > 0 && t[i] != t[j]) {
+      j = res[j - 1];
+    }
+
+    if (t[i] == t[j]) {
+      ++j;
+    }
+
+    res[i] = j;
+  }
+  return res;
+}
+
+/**
+ * KMP法によりテキストの中にあるパターン文字列と一致する連続した区間の
+ * 先頭の位置(0-indexed)たちを保持したリストを返す
+ * 時間計算量O(|txt| + |pattern|)
+ */
+vector<ll> kmp_search(const string &txt, const string &pattern) {
+  assert(pattern.length() > 0);
+
+  const ll n = txt.length();
+  const ll m = pattern.length();
+
+  vector<ll> failures = build_failures(pattern);
+  vector<ll> res;
+  for (ll i = 0, j = 0; i < n; ++i) {
+    while (j > 0 && txt[i] != pattern[j]) {
+      j = failures[j - 1];
+    }
+
+    if (txt[i] == pattern[j]) {
+      ++j;
+    }
+
+    if (j == m) {
+      res.push_back(i - m + 1);
+      j = failures[j - 1];
+    }
+  }
+  return res;
+}

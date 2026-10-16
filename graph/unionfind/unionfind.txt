@@ -1,0 +1,45 @@
+class UnionFind {
+  vector<ll> par, siz;
+
+public:
+  UnionFind(ll n) : par(n, -1), siz(n, 1) {
+  }
+
+  ll root(ll x) {
+    if (par[x] == -1) {
+      return x;
+    } else {
+      return par[x] = root(par[x]);
+    }
+  }
+
+  bool issame(ll x, ll y) {
+    return root(x) == root(y);
+  }
+
+  // 元々2つの頂点が同じ連結成分に属するならば-1
+  // 併合が起きる場合は消える側の頂点番号を返す
+  ll unite(ll x, ll y) {
+    x = root(x);
+    y = root(y);
+
+    if (x == y) {
+      return -1;
+    }
+
+    // yの方が連結してる頂点が少なくなるようにする
+    if (siz[x] < siz[y]) {
+      swap(x, y);
+    }
+
+    // y（小さい木）がxに取り込まれる
+    par[y] = x;
+    siz[x] += siz[y];
+
+    return y;
+  }
+
+  ll size(ll x) {
+    return siz[root(x)];
+  }
+};
