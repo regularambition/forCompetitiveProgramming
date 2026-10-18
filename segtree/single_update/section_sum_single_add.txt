@@ -1,0 +1,21 @@
+/**
+ * セグメント木が以下の要件を満たす場合に使う関数定義
+ * 実配列・作用素ともに整数型
+ * 実配列が保持する情報：区間和
+ * 作用素：指定した値を加算する
+ */
+template <class seisu> struct ActionsForSectionSumSingleAdd {
+  seisu biop(const seisu &d1, const seisu &d2) const {
+    return d1 + d2;
+  }
+
+  seisu id_element() const {
+    return 0;
+  }
+
+  seisu mapping(const seisu &d, const seisu &f) const {
+    return d + f;
+  }
+};
+
+template <class seisu> using SegmentTree = SegTree<seisu, seisu, ActionsForSectionSumSingleAdd<seisu>>;
