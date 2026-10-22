@@ -1,0 +1,113 @@
+/**
+ * 内部的にTrieを利用することでAho-Corasick法を実現するクラス
+ * [verification]
+ * https://judge.yosupo.jp/submission/412640
+ */
+class AhoCorasick {
+  static constexpr ll SIGMA = 26;
+  static constexpr ll NONEXISTENT_NODE_INDEX = -1;
+
+  struct Node {
+    ll parent;
+    /**
+     * dest[i] := 自身が表す文字列の末尾に対し
+     * 利用可能な文字のうち辞書順でi番目に来るものを連結して得られる
+     * 文字列の接尾辞であってTrieの中に存在する
+     * という条件を満たす最長のものに対応するノード番号
+     */
+    array<ll, SIGMA> dest;
+    /**
+     * 自身が表す文字列の真の接尾辞であってTrieの中に存在するという
+     * 条件を満たす最長のものに対応するノード番号
+     */
+    ll failure_link;
+
+    Node() : parent(NONEXISTENT_NODE_INDEX), failure_link(0) {
+      fill(ALL(dest), NONEXISTENT_NODE_INDEX);
+    }
+  };
+
+  vector<Node> nodes;
+
+public:
+  AhoCorasick() {
+    // 根に対応するノードが一つだけ存在する状態で初期化
+    nodes.emplace_back();
+  }
+
+  /**
+   * Trieに対して文字列sを追加し
+   * sの末尾に対応するノード番号を返す
+   * 時間計算量はO(|s|)
+   */
+  ll add_string(const string &s) {
+    ll v = 0;
+    for (const char &ch : s) {
+      ll u = nodes[v].dest[ch - 'a'];
+
+      if (u == NONEXISTENT_NODE_INDEX) {
+        const ll tmp = nodes.size();
+        u = nodes[v].dest[ch - 'a'] = tmp;
+        nodes.emplace_back();
+      }
+
+      nodes[u].parent = v;
+      v = u;
+    }
+
+    return v;
+  }
+
+  /**
+   * Trie内部においてfailure-linkなどを計算する
+   * 時間計算量はTrieが持つノード数をNとしてO(N)
+   */
+  void build() {
+    queue<ll> que;
+    rep(i, SIGMA) {
+      ll u = nodes[0].dest[i];
+
+      if (u == NONEXISTENT_NODE_INDEX) {
+        // Trieに登録された接尾辞は自明に空文字列のみ
+        nodes[0].dest[i] = 0;
+      } else {
+        // Trieに登録された真の接尾辞は自明に空文字列のみ
+        nodes[u].failure_link = 0;
+        que.push(u);
+      }
+    }
+
+    while (!que.empty()) {
+      ll v = que.front();
+      que.pop();
+
+      rep(i, SIGMA) {
+        const ll u = nodes[v].dest[i];
+        if (u == NONEXISTENT_NODE_INDEX) {
+          nodes[v].dest[i] = nodes[nodes[v].failure_link].dest[i];
+        } else {
+          nodes[u].failure_link = nodes[nodes[v].failure_link].dest[i];
+          que.push(u);
+        }
+      }
+    }
+  }
+
+  // Trieが持つノードの個数を返す
+  ll size() {
+    return nodes.size();
+  }
+
+  // Trie内部におけるノード番号を受け取りその直接の親にあたるノード番号を返す
+  ll parent_of_node(ll v) {
+    return nodes[v].parent;
+  }
+
+  /**
+   * Trie内部におけるノード番号を受け取り
+   * failure-linkを辿った先にあたるノード番号を返す
+   */
+  ll failure_link_of_node(ll v) {
+    return nodes[v].failure_link;
+  }
+};
