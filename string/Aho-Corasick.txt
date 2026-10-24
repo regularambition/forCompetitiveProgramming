@@ -22,7 +22,17 @@ class AhoCorasick {
      */
     ll failure_link;
 
-    Node() : parent(NONEXISTENT_NODE_INDEX), failure_link(0) {
+    // 実際に存在する文字列の末尾に対応するノードである場合に限りtrue
+    bool is_terminal;
+
+    /**
+     * failure linkに従って遷移を一度以上行った結果として見つかる
+     * 実際に存在する文字列の末尾に対応するノード番号
+     * ただしそのような真の接尾辞が存在しない場合は根のノード番号
+     */
+    ll output_link;
+
+    Node() : parent(NONEXISTENT_NODE_INDEX), failure_link(0), is_terminal(false), output_link(0) {
       fill(ALL(dest), NONEXISTENT_NODE_INDEX);
     }
   };
@@ -55,6 +65,8 @@ public:
       v = u;
     }
 
+    nodes[v].is_terminal = true;
+
     return v;
   }
 
@@ -81,12 +93,15 @@ public:
       ll v = que.front();
       que.pop();
 
+      const ll f = nodes[v].failure_link;
+      nodes[v].output_link = nodes[f].is_terminal ? f : nodes[f].output_link;
+
       rep(i, SIGMA) {
         const ll u = nodes[v].dest[i];
         if (u == NONEXISTENT_NODE_INDEX) {
-          nodes[v].dest[i] = nodes[nodes[v].failure_link].dest[i];
+          nodes[v].dest[i] = nodes[f].dest[i];
         } else {
-          nodes[u].failure_link = nodes[nodes[v].failure_link].dest[i];
+          nodes[u].failure_link = nodes[f].dest[i];
           que.push(u);
         }
       }
@@ -118,5 +133,22 @@ public:
    */
   ll to_direct_child(ll v, char ch) {
     return nodes[v].dest[ch - 'a'];
+  }
+
+  /**
+   * Trie内部におけるノード番号を受け取り
+   * output-linkを辿った先にあたるノード番号を返す
+   */
+  ll output_link_of_node(ll v) {
+    return nodes[v].output_link;
+  }
+
+  /**
+   * Trie内部におけるノード番号を受け取り
+   * それを末尾とする文字列が一つ以上存在する場合はtrue
+   * そうでなければfalseを返す
+   */
+  bool is_terminal_node(ll v) {
+    return nodes[v].is_terminal;
   }
 };
