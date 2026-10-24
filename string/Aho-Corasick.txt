@@ -110,4 +110,13 @@ public:
   ll failure_link_of_node(ll v) {
     return nodes[v].failure_link;
   }
+
+  /**
+   * Trie内部におけるノード番号を受け取り
+   * 自身が表す文字列の末尾に対して
+   * 文字chを連結させて得られる文字列に対応するノード番号を返す
+   */
+  ll to_direct_child(ll v, char ch) {
+    return nodes[v].dest[ch - 'a'];
+  }
 };
