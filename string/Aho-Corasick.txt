@@ -128,10 +128,11 @@ public:
 
   /**
    * Trie内部におけるノード番号を受け取り
-   * 自身が表す文字列の末尾に対して
-   * 文字chを連結させて得られる文字列に対応するノード番号を返す
+   * 自身が表す文字列の末尾に対して文字chを連結させて得られる文字列の
+   * 接尾辞であってTrieの中に存在するもののうち最長であるものの末尾に
+   * 対応するノード番号を返す
    */
-  ll to_direct_child(ll v, char ch) {
+  ll destination_of(ll v, char ch) {
     return nodes[v].dest[ch - 'a'];
   }
 
