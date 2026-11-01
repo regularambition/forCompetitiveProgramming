@@ -1,0 +1,173 @@
+// 使用例
+// https://atcoder.jp/contests/abc291/submissions/80550396
+
+/**
+ * 木の重心分解を行うと効果的に解ける問題のためのクラス
+ * 重心分解には頂点数Nに対しO(NlogN)の時間計算量がかかる
+ */
+class CentroidDecomposition {
+  static constexpr ll MAX_LEVEL = 20;
+  static constexpr ll NONEXISTENT_VERTEX = -1;
+
+  ll n;
+  vector<vector<ll>> G;
+  vector<ll> subtree_sz;
+  vector<ll> dfs_parent, dfs_order, dfs_stack;
+
+  // centroid_parent[u] := 重心木における頂点uの親
+  vector<ll> centroid_parent;
+  // centroid_depth[u] := 頂点uの重心分解の深さ
+  vector<ll> centroid_depth;
+  // component_size[u] := 頂点uが重心になった時点における連結成分の頂点数
+  vector<ll> component_size;
+  // 重心木本体
+  vector<vector<ll>> centroid_tree;
+  // 重心木の根にあたる頂点番号
+  ll centroid_root;
+
+  vector<bool> removed;
+
+  /**
+   * 頂点uを根とする木についてその連結成分に含まれる各頂点vに対し
+   * 「vを根とする部分木の頂点数」をdfsにより求め
+   * 頂点uを根とする木の頂点数を返す
+   */
+  ll calculate_subtree_sizes(ll u) {
+    dfs_order.clear();
+    dfs_stack.clear();
+
+    dfs_parent[u] = NONEXISTENT_VERTEX;
+    dfs_stack.push_back(u);
+
+    while (!dfs_stack.empty()) {
+      ll v = dfs_stack.back();
+      dfs_stack.pop_back();
+
+      dfs_order.push_back(v);
+      subtree_sz[v] = 1;
+
+      for (ll nv : G[v]) {
+        if (nv == dfs_parent[v] || removed[nv]) {
+          continue;
+        }
+
+        dfs_parent[nv] = v;
+        dfs_stack.push_back(nv);
+      }
+    }
+
+    // 行きがけ順に追加しているため先頭に近い頂点の方が
+    // 末尾に近い頂点の子孫にはなり得ない
+    invrep(i, dfs_order.size()) {
+      ll v = dfs_order[i];
+      ll p = dfs_parent[v];
+
+      if (p != NONEXISTENT_VERTEX) {
+        subtree_sz[p] += subtree_sz[v];
+      }
+    }
+
+    return subtree_sz[u];
+  }
+
+  /**
+   * 頂点uを根とし頂点数がszの木における重心にあたる
+   * 頂点番号を返す
+   */
+  ll find_centroid(ll u, ll sz) {
+    ll last_vertex = NONEXISTENT_VERTEX;
+    while (1) {
+      bool already_finished = true;
+
+      for (ll v : G[u]) {
+        if (v == last_vertex || removed[v]) {
+          continue;
+        }
+
+        if (subtree_sz[v] > sz / 2) {
+          last_vertex = u;
+          u = v;
+          already_finished = false;
+          break;
+        }
+      }
+
+      if (already_finished) {
+        break;
+      }
+    }
+
+    return u;
+  }
+
+  /**
+   * 重心分解の処理本体(再帰的に行う)
+   * level段階目にいることを前提とする時において
+   * 頂点uを根とし頂点数がszの木に対して要求された処理を行う
+   * pcは直前の段階で見つかった重心の頂点番号
+   */
+  void decompose(ll level, ll u, ll pc = NONEXISTENT_VERTEX) {
+    // 今注目している連結成分の重心を特定して処理
+    ll sz = calculate_subtree_sizes(u);
+    ll c = find_centroid(u, sz);
+    removed[c] = true;
+    centroid_parent[c] = pc;
+    centroid_depth[c] = level;
+    component_size[c] = sz;
+    if (pc != NONEXISTENT_VERTEX) {
+      centroid_tree[pc].push_back(c);
+      centroid_tree[c].push_back(pc);
+    } else {
+      centroid_root = c;
+    }
+
+    // 重心の隣接頂点それぞれに対して再帰的に処理する
+    for (ll v : G[c]) {
+      if (removed[v]) {
+        continue;
+      }
+
+      decompose(level + 1, v, c);
+    }
+  }
+
+public:
+  // 頂点数がszで辺を持たない状態として木を初期化する
+  CentroidDecomposition(ll sz)
+      : n(sz), G(sz), subtree_sz(sz), dfs_parent(sz), centroid_parent(sz), centroid_depth(sz), component_size(sz),
+        centroid_tree(sz), removed(sz) {
+    dfs_order.reserve(sz);
+    dfs_stack.reserve(sz);
+  }
+
+  // 頂点uとvとの間に辺を張る
+  void add_edge(ll u, ll v) {
+    G[u].push_back(v);
+    G[v].push_back(u);
+  }
+
+  // 重心分解を実行し、重心木を構成する
+  void build_centroid_tree() {
+    decompose(0, 0);
+  }
+
+  // 重心木における親の頂点番号を保持した列を返す
+  auto get_centroid_parent() {
+    return centroid_parent;
+  }
+
+  // 各頂点に対して重心分解の深さを保持した列を返す
+  auto get_centroid_depth() {
+    return centroid_depth;
+  }
+
+  // 各頂点に対して自身が重心となった時における連結成分の頂点数をを保持した列を返す
+  auto get_sizes_on_centroid_tree() {
+    return component_size;
+  }
+
+  // 重心木本体を返す
+  auto get_centroid_tree() {
+    return centroid_tree;
+  }
+};
