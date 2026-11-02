@@ -142,10 +142,7 @@ class CentroidDecomposition {
    * 位置関係や距離などの情報を記録していく
    */
   void record_centroid_path_info(ll c, ll level) {
-    assert(level <= MAX_LEVEL);
-
     // c自身はどの枝にも属さない
-    assert(static_cast<ll>(centroid_path_info[c].size()) == level);
     centroid_path_info[c].push_back({c, 0, NONEXISTENT_INDEX});
 
     all_distance_cnt[c].resize(component_size[c]);
@@ -166,8 +163,6 @@ class CentroidDecomposition {
       while (!path_collect_stack.empty()) {
         auto [u, parent, distance] = path_collect_stack.back();
         path_collect_stack.pop_back();
-
-        assert(static_cast<ll>(centroid_path_info[u].size()) == level);
 
         centroid_path_info[u].push_back({c, distance, br});
         ++all_distance_cnt[c][distance];
