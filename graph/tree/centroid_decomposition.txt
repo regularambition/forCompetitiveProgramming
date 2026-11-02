@@ -1,5 +1,6 @@
 // 使用例
 // https://atcoder.jp/contests/abc291/submissions/80550396
+// https://atcoder.jp/contests/yahoo-procon2018-final-open/submissions/80567818
 
 /**
  * 木の重心分解を行うと効果的に解ける問題のためのクラス
@@ -7,7 +8,7 @@
  */
 class CentroidDecomposition {
   static constexpr ll MAX_LEVEL = 20;
-  static constexpr ll NONEXISTENT_VERTEX = -1;
+  static constexpr ll NONEXISTENT_INDEX = -1;
 
   ll n;
   vector<vector<ll>> G;
@@ -27,6 +28,40 @@ class CentroidDecomposition {
 
   vector<bool> removed;
 
+  struct CentroidPathInfo {
+    ll centroid;
+    ll distance;
+    ll branch;
+  };
+
+  struct PathCollectState {
+    ll vertex;
+    ll parent;
+    ll distance;
+  };
+
+  /**
+   * centroid_path_info[v][level]の定義
+   * centroid -> level段階目においてvを含む連結成分の重心
+   * distance -> 元の木におけるvとcentroidの距離
+   * branch -> 重心cを連結成分から消した時vがどの枝に属するか(v==cならば-1)
+   */
+  vector<vector<CentroidPathInfo>> centroid_path_info;
+  vector<PathCollectState> path_collect_stack;
+
+  /**
+   * all_distance_cnt[c][r] := cが重心となった時の連結成分に
+   * 属していてcから距離rだけ離れた頂点の個数
+   */
+  vector<vector<ll>> all_distance_cnt;
+
+  /**
+   * branch_distance_cnt[c][b][r] := cが重心となった時の連結成分において
+   * その時点で有効な辺番号bの方向に潜った部分木に属していて
+   * cから距離rだけ離れた頂点の個数
+   */
+  vector<vector<vector<ll>>> branch_distance_cnt;
+
   /**
    * 頂点uを根とする木についてその連結成分に含まれる各頂点vに対し
    * 「vを根とする部分木の頂点数」をdfsにより求め
@@ -36,7 +71,7 @@ class CentroidDecomposition {
     dfs_order.clear();
     dfs_stack.clear();
 
-    dfs_parent[u] = NONEXISTENT_VERTEX;
+    dfs_parent[u] = NONEXISTENT_INDEX;
     dfs_stack.push_back(u);
 
     while (!dfs_stack.empty()) {
@@ -56,13 +91,13 @@ class CentroidDecomposition {
       }
     }
 
-    // 行きがけ順に追加しているため先頭に近い頂点の方が
+    // 行きがけ順に追加しているため先頭に近い頂点が
     // 末尾に近い頂点の子孫にはなり得ない
     invrep(i, dfs_order.size()) {
       ll v = dfs_order[i];
       ll p = dfs_parent[v];
 
-      if (p != NONEXISTENT_VERTEX) {
+      if (p != NONEXISTENT_INDEX) {
         subtree_sz[p] += subtree_sz[v];
       }
     }
@@ -75,7 +110,7 @@ class CentroidDecomposition {
    * 頂点番号を返す
    */
   ll find_centroid(ll u, ll sz) {
-    ll last_vertex = NONEXISTENT_VERTEX;
+    ll last_vertex = NONEXISTENT_INDEX;
     while (1) {
       bool already_finished = true;
 
@@ -101,12 +136,63 @@ class CentroidDecomposition {
   }
 
   /**
+   * 重心分解の補助的な処理
+   * level段階目において重心となる頂点cを特定した後
+   * それと同じ連結成分に属する全ての頂点について
+   * 位置関係や距離などの情報を記録していく
+   */
+  void record_centroid_path_info(ll c, ll level) {
+    assert(level <= MAX_LEVEL);
+
+    // c自身はどの枝にも属さない
+    assert(static_cast<ll>(centroid_path_info[c].size()) == level);
+    centroid_path_info[c].push_back({c, 0, NONEXISTENT_INDEX});
+
+    all_distance_cnt[c].resize(component_size[c]);
+    all_distance_cnt[c][0] = 1;
+
+    ll br = 0;
+
+    // 重心の各隣接頂点について、その部分木の頂点を全て探索していく
+    for (ll branch_root : G[c]) {
+      if (removed[branch_root]) {
+        continue;
+      }
+
+      path_collect_stack.clear();
+      path_collect_stack.push_back({branch_root, c, 1});
+      branch_distance_cnt[c].push_back(vector<ll>(subtree_sz[branch_root] + 1));
+      // dfsによる探索実行
+      while (!path_collect_stack.empty()) {
+        auto [u, parent, distance] = path_collect_stack.back();
+        path_collect_stack.pop_back();
+
+        assert(static_cast<ll>(centroid_path_info[u].size()) == level);
+
+        centroid_path_info[u].push_back({c, distance, br});
+        ++all_distance_cnt[c][distance];
+        ++branch_distance_cnt[c][br][distance];
+
+        for (ll v : G[u]) {
+          if (v == parent || removed[v]) {
+            continue;
+          }
+
+          path_collect_stack.push_back({v, u, distance + 1});
+        }
+      }
+
+      ++br;
+    }
+  }
+
+  /**
    * 重心分解の処理本体(再帰的に行う)
    * level段階目にいることを前提とする時において
-   * 頂点uを根とし頂点数がszの木に対して要求された処理を行う
+   * 頂点uを根とする木に対して要求された処理を行う
    * pcは直前の段階で見つかった重心の頂点番号
    */
-  void decompose(ll level, ll u, ll pc = NONEXISTENT_VERTEX) {
+  void decompose(ll level, ll u, ll pc = NONEXISTENT_INDEX) {
     // 今注目している連結成分の重心を特定して処理
     ll sz = calculate_subtree_sizes(u);
     ll c = find_centroid(u, sz);
@@ -114,12 +200,15 @@ class CentroidDecomposition {
     centroid_parent[c] = pc;
     centroid_depth[c] = level;
     component_size[c] = sz;
-    if (pc != NONEXISTENT_VERTEX) {
+    if (pc != NONEXISTENT_INDEX) {
       centroid_tree[pc].push_back(c);
       centroid_tree[c].push_back(pc);
     } else {
       centroid_root = c;
     }
+
+    // 重心の情報を使って隣接頂点の部分木に対して記録をつける
+    record_centroid_path_info(c, level);
 
     // 重心の隣接頂点それぞれに対して再帰的に処理する
     for (ll v : G[c]) {
@@ -131,13 +220,27 @@ class CentroidDecomposition {
     }
   }
 
+  /**
+   * all_distance_cnt[u][x]や
+   * branch_distance_cnt[c][b][x]の値を
+   * 安全に取得するための補助関数
+   */
+  const ll get_distance_cnt_element(vector<ll> &distance_cnt_vec, ll idx) {
+    if (idx < (ll)distance_cnt_vec.size()) {
+      return distance_cnt_vec[idx];
+    } else {
+      return 0;
+    }
+  }
+
 public:
   // 頂点数がszで辺を持たない状態として木を初期化する
   CentroidDecomposition(ll sz)
       : n(sz), G(sz), subtree_sz(sz), dfs_parent(sz), centroid_parent(sz), centroid_depth(sz), component_size(sz),
-        centroid_tree(sz), removed(sz) {
+        centroid_tree(sz), removed(sz), centroid_path_info(sz), all_distance_cnt(sz), branch_distance_cnt(sz) {
     dfs_order.reserve(sz);
     dfs_stack.reserve(sz);
+    path_collect_stack.reserve(sz);
   }
 
   // 頂点uとvとの間に辺を張る
@@ -152,22 +255,41 @@ public:
   }
 
   // 重心木における親の頂点番号を保持した列を返す
-  auto get_centroid_parent() {
+  const auto &get_centroid_parent() {
     return centroid_parent;
   }
 
   // 各頂点に対して重心分解の深さを保持した列を返す
-  auto get_centroid_depth() {
+  const auto &get_centroid_depth() {
     return centroid_depth;
   }
 
-  // 各頂点に対して自身が重心となった時における連結成分の頂点数をを保持した列を返す
-  auto get_sizes_on_centroid_tree() {
+  // 各頂点に対して自身が重心となった時における連結成分の頂点数を保持した列を返す
+  const auto &get_sizes_on_centroid_tree() {
     return component_size;
   }
 
   // 重心木本体を返す
-  auto get_centroid_tree() {
+  const auto &get_centroid_tree() {
     return centroid_tree;
+  }
+
+  /**
+   * 元の木において頂点uから距離xだけ離れた頂点の個数を返す
+   * 時間計算量はO(logN)
+   */
+  const ll count_vertices_dist_eq(ll u, ll x) {
+    ll res = 0;
+    for (const auto &[c, d, b] : centroid_path_info[u]) {
+      if (d == 0) {
+        // u自身が重心である場合にはもう再帰する必要なし
+        res += get_distance_cnt_element(all_distance_cnt[u], x);
+      } else if (d <= x) {
+        // uが属するcの子孫に属さない頂点による寄与
+        res += get_distance_cnt_element(all_distance_cnt[c], x - d) -
+               get_distance_cnt_element(branch_distance_cnt[c][b], x - d);
+      }
+    }
+    return res;
   }
 };
