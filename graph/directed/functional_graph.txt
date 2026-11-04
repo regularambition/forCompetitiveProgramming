@@ -1,0 +1,273 @@
+/**
+ * functional-graph の性質を利用するとうまく解ける問題向けのクラス
+ * 頂点数をNとして functional-graph は以下の性質を持つ
+ * 
+ * 1)全ての頂点はいずれも有向辺を1本だけ持つ
+ * 2)全ての連結成分は0本以上の枝（実態は有向木）が接続する有向サイクルとなる
+ * 3)任意の頂点に対し「自身を始点として有向辺の通りに
+ * 0回以上遷移し続けると必ずサイクルに到達する」という主張が成り立つ
+ * 
+ * 有向辺の追加が終わったら必ず complete_records() を呼び出し、その後で各機能を使う
+ * 
+ * サイクル頂点では cycle_vertex_info のみが有効
+ * 枝頂点では branch_vertex_info のみが有効
+ * 対象外の情報には NONEXISTENT_VALUE が入る
+ * 
+ * 周期性を利用する問題やダブリングにより遷移先頂点を
+ * 高速に特定することが求められる問題などで効果的
+ */
+class FunctionalGraph {
+  // ダブリングのために用いられる最大の指数（制約に応じて変更）
+  static constexpr int MAX_LEVEL = 60;
+  static constexpr int NONEXISTENT_VALUE = -1;
+
+  struct CycleVertexInfo {
+    int cycle_index;
+    int rank;
+    int len_of_cycle;
+
+    CycleVertexInfo(int c = NONEXISTENT_VALUE, int r = NONEXISTENT_VALUE, int l = NONEXISTENT_VALUE)
+        : cycle_index(c), rank(r), len_of_cycle(l) {
+    }
+  };
+
+  struct BranchVertexInfo {
+    int goal_vertex_of_cycle;
+    int dist_to_cycle;
+
+    BranchVertexInfo(int g = NONEXISTENT_VALUE, int d = NONEXISTENT_VALUE) : goal_vertex_of_cycle(g), dist_to_cycle(d) {
+    }
+  };
+
+  int n;
+  int found_cycle_cnt;
+  vector<int> P;
+  vector<int> indegree;
+
+  /**
+   * サイクルを構成している頂点uに対する
+   * cycle_vertex_info[u]の各フィールドの意味
+   * 
+   * cycle_index : uが属しているサイクルに対して割り振った番号（探索順に依存）
+   * rank : 同サイクルにおいてuは何番目の頂点として現れるか（探索順に依存）
+   * len_of_cycle : 同サイクルの長さ（即ち属する頂点数）
+   */
+  vector<CycleVertexInfo> cycle_vertex_info;
+
+  /**
+   * 枝の部分を構成している頂点uに対する
+   * branch_vertex_info[u]の各フィールドの意味
+   * 
+   * goal_vertex_of_cycle : uを始点として遷移し続けた果てに最初に現れる、サイクルの一部である頂点の番号
+   * dist_to_cycle : uからサイクルの一部である頂点までの距離
+   */
+  vector<BranchVertexInfo> branch_vertex_info;
+
+  // 転置グラフ
+  vector<vector<int>> G_transposed;
+
+  // dbl[u][x] := 頂点uから2^x回だけ遷移して到達する頂点番号
+  vector<vector<int>> dbl;
+
+  /**
+   * 枝の一部である頂点u（行き着くサイクルの頂点はc）を始点として
+   * cに行き着く枝に属する全ての頂点に対して記録を付ける
+   */
+  void record_remaining_branch(int u, int c, vector<bool> &visited) {
+    queue<int> que;
+    que.push(u);
+    visited[u] = true;
+    branch_vertex_info[u].goal_vertex_of_cycle = c;
+    branch_vertex_info[u].dist_to_cycle = 1;
+
+    while (!que.empty()) {
+      int v = que.front();
+      que.pop();
+
+      for (int nv : G_transposed[v]) {
+        // 探索対象は有向木であるため同じ頂点を二度踏むことはない
+        que.push(nv);
+        visited[nv] = true;
+        branch_vertex_info[nv].goal_vertex_of_cycle = c;
+        branch_vertex_info[nv].dist_to_cycle = branch_vertex_info[v].dist_to_cycle + 1;
+      }
+    }
+  }
+
+  /**
+   * 枝の頂点を始点としてそこから到達可能な全ての
+   * 枝およびサイクルの一部である頂点に対して記録を付ける
+   */
+  void record_branch_and_cycle_info(int u, vector<bool> &visited) {
+    vector<int> vec_as_stk;
+    vec_as_stk.push_back(u);
+    visited[u] = true;
+
+    // まずサイクルを特定する
+    int first_cycle_vertex = NONEXISTENT_VALUE;
+    while (1) {
+      if (!visited[P[u]]) {
+        u = P[u];
+        vec_as_stk.push_back(u);
+        visited[u] = true;
+      } else {
+        first_cycle_vertex = P[u];
+        break;
+      }
+    }
+
+    // サイクルの長さを特定する
+    int cycle_len = NONEXISTENT_VALUE;
+    invrep(i, vec_as_stk.size()) {
+      if (vec_as_stk[i] == first_cycle_vertex) {
+        cycle_len = vec_as_stk.end() - (vec_as_stk.begin() + i);
+        break;
+      }
+    }
+
+    // サイクルに対して記録を付ける
+    rep(i, cycle_len) {
+      const int v = *(vec_as_stk.rbegin() + i);
+      cycle_vertex_info[v].cycle_index = found_cycle_cnt;
+      cycle_vertex_info[v].rank = cycle_len - 1 - i;
+      cycle_vertex_info[v].len_of_cycle = cycle_len;
+    }
+
+    // 特定したサイクルに接続している枝に対して記録を付ける
+    rep(i, cycle_len) {
+      const int v = *(vec_as_stk.rbegin() + i);
+      for (int nv : G_transposed[v]) {
+        if (cycle_vertex_info[nv].cycle_index != NONEXISTENT_VALUE) {
+          continue;
+        }
+
+        record_remaining_branch(nv, v, visited);
+      }
+    }
+
+    ++found_cycle_cnt;
+  }
+
+  /**
+   * 枝を持たないサイクルに対して記録を付ける
+   */
+  void record_cycle_info(int u, vector<bool> &visited) {
+    vector<int> vec_as_stk;
+    vec_as_stk.push_back(u);
+    visited[u] = true;
+
+    int cycle_len = 0;
+    while (1) {
+      ++cycle_len;
+      if (visited[P[u]]) {
+        break;
+      }
+      u = P[u];
+      vec_as_stk.push_back(u);
+      visited[u] = true;
+    }
+
+    rep(i, cycle_len) {
+      const int v = vec_as_stk[i];
+      cycle_vertex_info[v].cycle_index = found_cycle_cnt;
+      cycle_vertex_info[v].rank = i;
+      cycle_vertex_info[v].len_of_cycle = cycle_len;
+    }
+
+    ++found_cycle_cnt;
+  }
+
+  /**
+   * ダブリングにより遷移先頂点を特定するための表を完成させる
+   */
+  void complete_doubling_table() {
+    rep(x, MAX_LEVEL) {
+      rep(u, n) {
+        dbl[u][x + 1] = dbl[dbl[u][x]][x];
+      }
+    }
+  }
+
+public:
+  FunctionalGraph(int sz)
+      : n(sz), found_cycle_cnt(0), P(sz), indegree(sz), cycle_vertex_info(sz), branch_vertex_info(sz), G_transposed(sz),
+        dbl(sz, vector<int>(MAX_LEVEL + 1)) {
+  }
+
+  /**
+   * 頂点uからvの向きに辺を張る
+   */
+  void add_directed_edge(int u, int v) {
+    P[u] = dbl[u][0] = v;
+    G_transposed[v].push_back(u);
+    ++indegree[v];
+  }
+
+  /**
+   * 各頂点に対する種々の記録を持つ列を完成させる
+   * 遷移回数が最大でKという制約のもと時間計算量はO(NlogK)
+   */
+  void complete_records() {
+    complete_doubling_table();
+
+    // 枝およびそれが接続しているサイクルに対して記録を付ける
+    vector<bool> visited(n, false);
+    rep(i, n) {
+      if (visited[i] || indegree[i] != 0) {
+        continue;
+      }
+
+      record_branch_and_cycle_info(i, visited);
+    }
+
+    // 枝を一切持たないサイクルが残っているため忘れずに記録を付ける
+    rep(i, n) {
+      if (visited[i]) {
+        continue;
+      }
+      record_cycle_info(i, visited);
+    }
+  }
+
+  // このfunctional-graphの頂点数を返す
+  ll size() {
+    return n;
+  }
+
+  // 頂点vがサイクルの一部ならばtrue、そうでなければfalseを返す
+  bool is_part_of_cycle(ll v) {
+    return cycle_vertex_info[v].cycle_index != NONEXISTENT_VALUE;
+  }
+
+  // 頂点vが枝の一部ならばtrue、そうでなければfalseを返す
+  bool is_part_of_branch(ll v) {
+    return !is_part_of_cycle(v);
+  }
+
+  const auto &get_cycle_vertex_info(ll v) const {
+    return cycle_vertex_info[v];
+  }
+
+  const auto &get_branch_vertex_info(ll v) const {
+    return branch_vertex_info[v];
+  }
+
+  /**
+   * 頂点vから有向辺の通りにK回だけ遷移した
+   * 結果として到達する頂点番号を返す
+   * 制約で要求され得る最大のKに対して時間計算量はO(logK)
+   */
+  ll to_destination(ll v, ll K) {
+    assert(K < (1LL << (MAX_LEVEL + 1)));
+
+    rep(k, MAX_LEVEL + 1) {
+      if (!kth_bit(K, k)) {
+        continue;
+      }
+
+      v = dbl[v][k];
+    }
+
+    return v;
+  }
+};
