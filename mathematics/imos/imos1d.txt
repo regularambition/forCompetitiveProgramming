@@ -1,0 +1,99 @@
+/**
+ * 区間に対して加算するクエリが多数要求され
+ * 最終的な状態における値のみが必要な問題でimos法を利用する
+ * 
+ * 固定値の加算・一次関数型の量の加算を定数時間で実行可能
+ * 最終的な復元には実際の要素数Nに対してO(N)の時間計算量
+ * 各メソッドは通常の vector と同様に 0-indexed
+ */
+template <class seisu = ll> class Imos1D {
+  bool use_linear_addition;
+  int net_len, n;
+
+  // gain[i] := 第i項に対して加算される値
+  vector<seisu> gain;
+  // diff1[i] := gain[i] - gain[i-1]
+  vector<seisu> diff1;
+  // diff2[i] := diff1[i] - diff1[i-1]
+  vector<seisu> diff2;
+
+  // 最終的な状態における値のみ必要なので resolve を実行するのは一度きり
+  bool already_resolved;
+
+  /**
+   * 区間に対して加算する全クエリの情報を反映し終えた後の時点における
+   * 階差数列から各項に対して実際に加算される値を復元する
+   */
+  void resolve() {
+    if (already_resolved) {
+      return;
+    }
+
+    if (use_linear_addition) {
+      rep(i, n) {
+        diff1[i] += (i >= 1) ? diff1[i - 1] : 0;
+        diff1[i] += diff2[i];
+      }
+    }
+
+    rep(i, n) {
+      gain[i] += (i >= 1) ? gain[i - 1] : 0;
+      gain[i] += diff1[i];
+    }
+
+    already_resolved = true;
+  }
+
+public:
+  /**
+   * 一次関数型の量を加算するクエリが必要な場合は
+   * use_linear を true として呼び出す
+   */
+  Imos1D(int sz, bool use_linear = false)
+      : use_linear_addition(use_linear), net_len(sz), n(sz + 10), gain(n, 0), diff1(n, 0), already_resolved(false) {
+    if (use_linear) {
+      diff2.resize(n, 0);
+    }
+  }
+
+  // 区間[l,r)に対して固定値xを加算する
+  void add_constant(ll l, ll r, seisu x) {
+    diff1[l] += x;
+    diff1[r] -= x;
+  }
+
+  /**
+   * 区間[l,r)に対して
+   * u*(i-l)+v 
+   * という数式で記述される一次関数型の量を加算する
+   */
+  void add_linear(ll l, ll r, seisu u, seisu v) {
+    assert(use_linear_addition);
+
+    diff2[l] += v;
+    diff2[l + 1] -= v;
+
+    diff2[l + 1] += u;
+    diff2[r] -= u;
+
+    diff2[r] += -(u * (r - 1 - l) + v);
+    diff2[r + 1] -= -(u * (r - 1 - l) + v);
+  }
+
+  // 第i項に加算される値を返す
+  seisu get_gain(ll i) {
+    resolve();
+    return gain[i];
+  }
+
+  // 数列gainを返す
+  auto gain_vec() {
+    resolve();
+    return gain;
+  }
+
+  // 実際の要素数を返す
+  ll size() {
+    return net_len;
+  }
+};
