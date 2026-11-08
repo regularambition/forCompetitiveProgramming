@@ -58,8 +58,12 @@ public:
 
   // 区間[l,r)に対して固定値xを加算する
   void add_constant(ll l, ll r, seisu x) {
-    diff1[l] += x;
-    diff1[r] -= x;
+    if (!use_linear_addition) {
+      diff1[l] += x;
+      diff1[r] -= x;
+    } else {
+      add_linear(l, r, 0, x);
+    }
   }
 
   /**
