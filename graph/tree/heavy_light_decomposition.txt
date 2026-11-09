@@ -1,0 +1,245 @@
+// 使用例
+// https://atcoder.jp/contests/awc0074/submissions/80721175
+
+/**
+ * 頂点数 N の木に対してHL分解を実行してパスクエリを区間クエリに
+ * 帰着させるのが有効な問題で利用するクラス
+ * 各情報の構築にはdfsが用いられ、かかる時間計算量は O(N)
+ * 
+ * （以下、HL分解により構築された頂点列を Z と記述する）
+ * 
+ * クエリで扱う対象が頂点である場合、本来であれば
+ * A[v] := 頂点 v が持っている値
+ * という構造になっているものを
+ * B[i] := 頂点 Z[i] が持っている値
+ * と定義することによって効率よく処理できる
+ * 
+ * クエリで扱う対象が辺である場合、本来であれば
+ * A[e] := 辺 e が持っている値
+ * という構造になっているものを
+ * B[i] := 頂点 Z[i] およびその親を結ぶ辺が持っている値
+ * （Z[i] が根である場合は取得クエリに影響を与えないダミー値）
+ * と定義することによって効率よく処理できる
+ * 
+ * 上記のように考えることで、どちらの場合に対しても
+ * 長さが N の列で管理すれば良くなり統一的に扱えるため非常に嬉しい
+ */
+class TreeHlDecomposition {
+  static constexpr int ROOT_OF_TREE = 0;
+  static constexpr int NONEXISTENT_VALUE = -1;
+
+  bool already_built;
+  int n;
+  vector<vector<pair<int, ll>>> G;
+
+  // parent[u] := 頂点 u の親
+  vector<int> parent;
+  // parent_edge_weight[u] := 頂点 u と頂点 parent[u] を結ぶ辺の重み
+  vector<ll> parent_edge_weight;
+  // depth[u] := 頂点 u の深さ
+  vector<int> depth;
+  // subtree_sz[u] := 頂点 u を根とする部分木の頂点数
+  vector<int> subtree_sz;
+  // heavy_child[u] := 頂点 u のheavyな子
+  vector<int> heavy_child;
+  // head_of_heavy_path[u] := 頂点 u が属するheavy-path上に存在する深さが最小の頂点
+  vector<int> head_of_heavy_path;
+  // pos[u] := 頂点番号をHL分解の情報に基づいて並べた時における頂点 u の位置
+  vector<int> pos;
+  // pos_inv[i] := HL分解完了後に完成した配列の第 i 要素にあたる頂点番号
+  vector<int> pos_inv;
+
+  struct VertexInfoWhenDfs {
+    int vertex;
+    int parent;
+    int depth;
+
+    VertexInfoWhenDfs(int vertex_, int parent_, int depth_) : vertex(vertex_), parent(parent_), depth(depth_) {
+    }
+  };
+
+  /**
+   * DFSにより parent, parent_edge_weight, depth, subtree_sz, heavy_child
+   * を構築する
+   */
+  void find_basic_tree_info() {
+    stack<VertexInfoWhenDfs> stk;
+    stk.emplace(ROOT_OF_TREE, NONEXISTENT_VALUE, 0);
+    vector<int> vertices(n);
+    int cursor = 0;
+
+    while (!stk.empty()) {
+      VertexInfoWhenDfs info = stk.top();
+      stk.pop();
+      vertices[cursor] = info.vertex;
+      ++cursor;
+
+      parent[info.vertex] = info.parent;
+      depth[info.vertex] = info.depth;
+
+      for (auto &[v, w] : G[info.vertex]) {
+        if (v != info.parent) {
+          stk.emplace(v, info.vertex, info.depth + 1);
+        }
+      }
+    }
+
+    assert(cursor == n);
+
+    // 必ず子孫から祖先の順に見ることになる
+    invrep(i, n) {
+      int u = vertices[i];
+      int pu = parent[u];
+      if (pu != NONEXISTENT_VALUE) {
+        subtree_sz[pu] += subtree_sz[u];
+      }
+
+      int h = NONEXISTENT_VALUE;
+      int mxsz = -1;
+      for (auto &[v, w] : G[u]) {
+        if (v == pu) {
+          parent_edge_weight[u] = w;
+        } else if (chmax(mxsz, subtree_sz[v])) {
+          h = v;
+        }
+      }
+      heavy_child[u] = h;
+    }
+  }
+
+  /**
+   * 全頂点に対して head_of_heavy_path, pos, pos_inv を構築する
+   * find_basic_tree_info が終わった後に実行すること
+   */
+  void assign_every_vertex_index_of_pos() {
+    int cursor = 0;
+    stack<pair<int, int>> stk;
+    stk.emplace(ROOT_OF_TREE, ROOT_OF_TREE);
+    while (!stk.empty()) {
+      auto [u, h] = stk.top();
+      stk.pop();
+
+      while (u != NONEXISTENT_VALUE) {
+        head_of_heavy_path[u] = h;
+        pos[u] = cursor;
+        pos_inv[cursor] = u;
+        ++cursor;
+
+        // light な子の処理は後で行われる
+        for (auto &[v, w] : G[u]) {
+          if (v == parent[u] || v == heavy_child[u]) {
+            continue;
+          }
+          stk.emplace(v, v);
+        }
+
+        u = heavy_child[u];
+      }
+    }
+  }
+
+  /**
+   * HL分解を実行して全頂点に対する情報を構築する
+   */
+  void build() {
+    if (already_built) {
+      return;
+    }
+
+    find_basic_tree_info();
+    assign_every_vertex_index_of_pos();
+
+    already_built = true;
+  }
+
+public:
+  // 木の頂点数を sz として初期化する
+  TreeHlDecomposition(int sz)
+      : already_built(false), n(sz), G(n), parent(n, NONEXISTENT_VALUE), parent_edge_weight(n),
+        depth(n, NONEXISTENT_VALUE), subtree_sz(n, 1), heavy_child(n, NONEXISTENT_VALUE), head_of_heavy_path(n), pos(n),
+        pos_inv(n) {
+  }
+
+  // 2頂点 u,v の間に重み w の辺を張る
+  void add_edge(ll u, ll v, ll w = 1) {
+    assert(!already_built);
+
+    G[u].emplace_back(v, w);
+    G[v].emplace_back(u, w);
+  }
+
+  // 木の頂点数を返す
+  ll size() {
+    return n;
+  }
+
+  /**
+   * 2頂点 u,v の LCA を返す
+   * 時間計算量は O(logN)
+   */
+  ll find_lca(ll u, ll v) {
+    build();
+
+    while (head_of_heavy_path[u] != head_of_heavy_path[v]) {
+      if (depth[head_of_heavy_path[u]] > depth[head_of_heavy_path[v]]) {
+        swap(u, v);
+      }
+
+      v = parent[head_of_heavy_path[v]];
+    }
+
+    return (depth[u] < depth[v]) ? u : v;
+  }
+
+  /**
+   * 2頂点 u,v 間を結ぶパスに対して
+   * process(l,r) という形式で記述される、
+   * 区間 [l,r) に属する全ての整数に対して実行される処理を行う
+   * 
+   * クエリで扱う対象は
+   * target_is_edge が false ならばパス上の全頂点
+   * target_is_edge が true ならばパス上の全ての辺
+   * 
+   * process の時間計算量が O(X) である時
+   * かかる時間計算量は O(X*logN)
+   */
+  template <class F> void path_query(ll u, ll v, F process, bool target_is_edge = false) {
+    build();
+
+    while (head_of_heavy_path[u] != head_of_heavy_path[v]) {
+      if (depth[head_of_heavy_path[u]] > depth[head_of_heavy_path[v]]) {
+        swap(u, v);
+      }
+
+      process(pos[head_of_heavy_path[v]], pos[v] + 1);
+      v = parent[head_of_heavy_path[v]];
+    }
+
+    if (depth[u] > depth[v]) {
+      swap(u, v);
+    }
+
+    if (!target_is_edge) {
+      process(pos[u], pos[v] + 1);
+    } else if (u != v) {
+      process(pos[u] + 1, pos[v] + 1);
+    }
+  }
+
+  /**
+   * 頂点 Z[i] が根ならば true
+   * そうでなければ false
+   */
+  bool is_root(ll i) {
+    build();
+    return pos_inv[i] == ROOT_OF_TREE;
+  }
+
+  /**
+   * 頂点 Z[i] とその親を結ぶ辺の重みを返す
+   */
+  ll get_edge_weight(ll i) {
+    build();
+    return parent_edge_weight[pos_inv[i]];
+  }
+};
