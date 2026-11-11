@@ -11,7 +11,7 @@ public:
    * 元々の要素数が N である列に対して
    * インスタンス生成に必要な時間計算量は O(NlogN)
    */
-  CompressedPositionResolver(vector<T> vec_) {
+  CompressedPositionResolver(const vector<T> &vec_) {
     vec = vec_;
     sort(ALL(vec));
     vec.erase(unique(ALL(vec)), vec.end());
