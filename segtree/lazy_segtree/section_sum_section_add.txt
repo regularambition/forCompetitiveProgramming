@@ -2,7 +2,7 @@ template <class seisu> struct SectionSum {
   seisu total;
   seisu len;
 
-  SectionSum(seisu t, seisu l) : total(t), len(l) {
+  SectionSum(seisu t = 0, seisu l = 0) : total(t), len(l) {
   }
 };
 
@@ -18,7 +18,7 @@ template <class seisu> struct ActionsForSectionSumSectionAdd {
   }
 
   SectionSum<seisu> id_element() const {
-    return SectionSum<seisu>(0, 0);
+    return SectionSum<seisu>();
   }
 
   SectionSum<seisu> mapping(const SectionSum<seisu> &d, const seisu &f) const {
