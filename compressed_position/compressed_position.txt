@@ -1,0 +1,32 @@
+/**
+ * 内部的に持っている vector を利用して
+ * 座標圧縮を行うクラス
+ */
+template <class T = ll> class CompressedPositionResolver {
+  vector<T> vec;
+
+public:
+  /**
+   * sort + unique の事前準備が行われるため
+   * 元々の要素数が N である列に対して
+   * インスタンス生成に必要な時間計算量は O(NlogN)
+   */
+  CompressedPositionResolver(vector<T> vec_) {
+    vec = vec_;
+    sort(ALL(vec));
+    vec.erase(unique(ALL(vec)), vec.end());
+  }
+
+  /**
+   * 座標圧縮を行った後の列における
+   * key の添字（あるいは順位）を返す
+   * 元々の要素数が N である列に対して
+   * 時間計算量は O(logN)
+   */
+  ll find_position(T key) {
+    const auto itr = lower_bound(ALL(vec), key);
+    assert(itr != vec.end());
+    assert(*itr == key);
+    return itr - vec.begin();
+  }
+};
