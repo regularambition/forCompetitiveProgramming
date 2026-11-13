@@ -1,0 +1,55 @@
+/**
+ * 2次元累積和を使う問題向けのクラス
+ */
+template <class T = ll> class Ruisekiwa2D {
+  ll h, w;
+  vector<vector<T>> mat;
+  vector<vector<T>> ruiseki;
+  bool already_built;
+
+  /**
+   * 2次元累積和の行列を構築する
+   * 時間計算量は O(h*w)
+   */
+  void build() {
+    if (already_built) {
+      return;
+    }
+
+    rep(i, h) {
+      rep(j, w) {
+        ruiseki[i + 1][j + 1] = ruiseki[i + 1][j] + ruiseki[i][j + 1] - ruiseki[i][j] + mat[i][j];
+      }
+    }
+
+    already_built = true;
+  }
+
+public:
+  /**
+   * 行数h,列数wでインスタンスを生成
+   */
+  Ruisekiwa2D(ll h_, ll w_)
+      : h(h_), w(w_), mat(h, vector<T>(w, 0)), ruiseki(h + 1, vector<T>(w + 1, 0)), already_built(false) {
+  }
+
+  /**
+   * r行目c列目の位置にxを加算する
+   * 2次元累積和構築前のみ利用可能
+   */
+  void add(ll r, ll c, ll x) {
+    assert(!already_built);
+    mat[r][c] += x;
+  }
+
+  /**
+   * 行番号が区間 [rmin,rub) に属しており
+   * 列番号が区間 [cmin,cub) に属している
+   * 領域内部に存在する値の合計を返す
+   */
+  T find_sum(ll rmin, ll cmin, ll rub, ll cub) {
+    build();
+    T res = ruiseki[rub][cub] - ruiseki[rub][cmin] - ruiseki[rmin][cub] + ruiseki[rmin][cmin];
+    return res;
+  }
+};
