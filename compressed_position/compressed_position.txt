@@ -18,6 +18,20 @@ public:
   }
 
   /**
+   * 実際に保持されている要素数を返す
+   */
+  ll size() {
+    return vec.size();
+  }
+
+  /**
+   * 昇順において rnk 位に該当する値を返す
+   */
+  T value_of(ll rnk) {
+    return vec[rnk];
+  }
+
+  /**
    * 座標圧縮を行った後の列における
    * key の添字（あるいは順位）を返す
    * 元々の要素数が N である列に対して
@@ -27,6 +41,30 @@ public:
     const auto itr = lower_bound(ALL(vec), key);
     assert(itr != vec.end());
     assert(*itr == key);
+    return itr - vec.begin();
+  }
+
+  /**
+   * 座標圧縮を行った後の列における
+   * key よりも真に大きい値であって
+   * 最小であるものの添字（あるいは順位）を返す
+   * 元々の要素数が N である列に対して
+   * 時間計算量は O(logN)
+   */
+  ll find_upper_bound(T key) {
+    const auto itr = upper_bound(ALL(vec), key);
+    return itr - vec.begin();
+  }
+
+  /**
+   * 座標圧縮を行った後の列における
+   * key 以上である値であって
+   * 最小であるものの添字（あるいは順位）を返す
+   * 元々の要素数が N である列に対して
+   * 時間計算量は O(logN)
+   */
+  ll find_lower_bound(T key) {
+    const auto itr = lower_bound(ALL(vec), key);
     return itr - vec.begin();
   }
 };
