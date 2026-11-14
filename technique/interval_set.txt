@@ -40,8 +40,8 @@ public:
    */
   set<interval> all_intervals() {
     set<interval> res = st;
-    res.erase(*res.begin());
-    res.erase(*res.rbegin());
+    res.erase(res.begin());
+    res.erase(prev(res.end()));
     return res;
   }
 
