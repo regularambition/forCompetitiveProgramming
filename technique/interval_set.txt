@@ -1,0 +1,231 @@
+/**
+ * ある条件を満たす整数を元とする順序付き集合を
+ * 極大な連続区間の集合として管理するためのクラス
+ * 連続区間は半開区間として保持される
+ * 
+ * 区間の追加・削除は併合を伴って行われるため
+ * 合計で Q 回の処理が要求されている状況において
+ * 償却計算量 O(QlogQ) 程度で処理しきれる
+ */
+template <class T = ll> class IntervalSet {
+
+  static_assert(std::is_integral_v<T> && std::is_signed_v<T>, "T must be a signed integral type");
+
+  static constexpr T SENTINEL = std::numeric_limits<T>::max() / 2;
+
+  using interval = pair<T, T>;
+  set<interval> st;
+  T element_cnt;
+
+public:
+  /**
+   * 番兵を持った状態でインスタンスが生成される
+   */
+  IntervalSet() : element_cnt(0) {
+    st.insert({SENTINEL, SENTINEL});
+    st.insert({-SENTINEL, -SENTINEL});
+  }
+
+  /**
+   * 条件を満たす整数により構成された連続区間の個数を返す
+   */
+  size_t size() {
+    return st.size() - 2;
+  }
+
+  /**
+   * 連続区間の集合そのものを返す（番兵は消える）
+   * コピーして返すため区間の個数 M に対して
+   * O(M) の時間・空間計算量が必要となる
+   */
+  set<interval> all_intervals() {
+    set<interval> res = st;
+    res.erase(*res.begin());
+    res.erase(*res.rbegin());
+    return res;
+  }
+
+  /**
+   * 条件を満たす整数の個数を返す
+   */
+  T number_of_valid_elements() {
+    return element_cnt;
+  }
+
+  /**
+   * 区間 [u,v) に属する全ての整数が
+   * 条件を満たす場合に限って true を返す
+   * 区間の個数 M に対し時間計算量 O(M)
+   */
+  bool is_covered_entirely(T u, T v) {
+    assert(-SENTINEL < u);
+    assert(u < v);
+    assert(v < SENTINEL);
+
+    const auto itr = st.lower_bound({v, v});
+    if (v == itr->first) {
+      return false;
+    }
+
+    const auto pitr = prev(itr);
+    return pitr->first <= u && v <= pitr->second;
+  }
+
+  /**
+   * 整数 x が条件を満たす場合に限って true を返す
+   * 区間の個数 M に対し時間計算量 O(M)
+   */
+  bool is_covered(T x) {
+    assert(-SENTINEL < x && x < SENTINEL - 1);
+    return is_covered_entirely(x, x + 1);
+  }
+
+  /**
+   * 区間 [u,v) に属する全ての整数を追加し
+   * 実際に増えた整数の個数を返す
+   */
+  T add_entirely(T u, T v) {
+    assert(-SENTINEL < u);
+    assert(u < v);
+    assert(v < SENTINEL);
+
+    auto itr = st.lower_bound({u, u});
+    const auto pitr = prev(itr);
+
+    interval added_interval = {u, v};
+    vector<interval> erased_intervals;
+    T res = v - u;
+
+    auto adding_helper = [&]() {
+      while (1) {
+        if (itr->second <= v) {
+          erased_intervals.push_back(*itr);
+          ++itr;
+        } else {
+          if (v < itr->first) {
+            // [u,v) と交差しないので何もしない
+          } else {
+            added_interval.second = itr->second;
+            erased_intervals.push_back(*itr);
+          }
+
+          break;
+        }
+      }
+
+      // (追加される整数の個数) = (新しく追加した区間長) - (併合により消えた区間長の合計)
+      res = added_interval.second - added_interval.first;
+      for (interval &e : erased_intervals) {
+        res -= e.second - e.first;
+        st.erase(e);
+      }
+      st.insert(added_interval);
+    };
+
+    if (u == itr->first) {
+      adding_helper();
+    } else if (pitr->second < u && v < itr->first) {
+      // [u,v) と交差する区間が存在しないため単にこれを追加するのみ
+      st.insert(added_interval);
+    } else {
+      if (pitr->second < u) {
+        // pitr 以前が指す区間は [u,v) と交差しない
+      } else {
+        added_interval.first = pitr->first;
+        added_interval.second = max(added_interval.second, pitr->second);
+        erased_intervals.push_back(*pitr);
+      }
+      adding_helper();
+    }
+
+    element_cnt += res;
+    return res;
+  }
+
+  /**
+   * 整数 x を追加し
+   * 実際に増えた整数の個数を返す
+   */
+  T add(T x) {
+    assert(-SENTINEL < x && x < SENTINEL - 1);
+    return add_entirely(x, x + 1);
+  }
+
+  /**
+   * 区間 [u,v) に属する全ての整数を削除し
+   * 実際に削除された整数の個数を返す
+   */
+  T erase_entirely(T u, T v) {
+    assert(-SENTINEL < u);
+    assert(u < v);
+    assert(v < SENTINEL);
+
+    auto itr = st.lower_bound({u, u});
+    const auto pitr = prev(itr);
+
+    vector<interval> erased_intervals;
+    T res = 0;
+
+    auto erasing_helper = [&]() {
+      while (1) {
+        if (itr->second <= v) {
+          erased_intervals.push_back(*itr);
+          ++itr;
+        } else {
+          if (v <= itr->first) {
+            // [u,v) が影響しない区間なので何もしない
+          } else {
+            res += v - itr->first;
+            res -= itr->second - itr->first;
+            erased_intervals.push_back(*itr);
+            st.insert({v, itr->second});
+          }
+
+          break;
+        }
+      }
+
+      for (interval &e : erased_intervals) {
+        res += e.second - e.first;
+        st.erase(e);
+      }
+    };
+
+    if (u == itr->first) {
+      erasing_helper();
+    } else if (pitr->second <= u && v <= itr->first) {
+      // [u,v) により影響を受ける区間がないので何も削除されない
+    } else {
+      const auto [L, R] = *pitr;
+
+      if (pitr->second <= u) {
+        // [u,v) による影響が現れ得るのは itr が指す区間以降のみ
+        erasing_helper();
+      } else if (v < pitr->second) {
+        // pitr が指す区間のみが影響を受ける
+        st.erase(*pitr);
+        res = v - u;
+        st.insert({L, u});
+        st.insert({v, R});
+      } else {
+        erased_intervals.push_back(*pitr);
+        erasing_helper();
+        // 交差部分に関して帳尻合わせ
+        res -= u - L;
+        st.insert({L, u});
+      }
+    }
+
+    element_cnt -= res;
+    return res;
+  }
+
+  /**
+   * 整数 x を削除し
+   * 実際に削除された整数の個数を返す
+   */
+  T erase(T x) {
+    assert(-SENTINEL < x && x < SENTINEL - 1);
+    return erase_entirely(x, x + 1);
+  }
+};
