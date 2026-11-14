@@ -29,7 +29,7 @@ public:
   /**
    * 条件を満たす整数により構成された連続区間の個数を返す
    */
-  size_t size() {
+  ll size() {
     return st.size() - 2;
   }
 
@@ -275,5 +275,53 @@ public:
   auto find_covering_interval(T x) {
     assert(-SENTINEL < x && x < SENTINEL - 1);
     return find_entirely_covering_interval(x, x + 1);
+  }
+
+  /**
+   * x 以上の整数であって
+   * 条件を満たすもののうち最小値を返す
+   * 存在しない場合は番兵のうち負の値を持つ方を返す
+   * 区間の個数 M に対し時間計算量 O(logM)
+   */
+  T min_valid_value_geq(T x) {
+    assert(-SENTINEL < x && x < SENTINEL - 1);
+
+    auto itr = st.lower_bound({x, x});
+    if (x == itr->first) {
+      return x;
+    }
+
+    auto pitr = prev(itr);
+    if (pitr != st.begin() && x < pitr->second) {
+      return x;
+    }
+    if (itr->first == SENTINEL) {
+      return -SENTINEL;
+    }
+    return itr->first;
+  }
+
+  /**
+   * x 以下の整数であって
+   * 条件を満たすもののうち最大値を返す
+   * 存在しない場合は番兵のうち負の値を持つ方を返す
+   * 区間の個数 M に対し時間計算量 O(logM)
+   */
+  T max_valid_value_leq(T x) {
+    assert(-SENTINEL < x && x < SENTINEL - 1);
+
+    auto itr = st.lower_bound({x, x});
+    if (x == itr->first) {
+      return x;
+    }
+
+    auto pitr = prev(itr);
+    if (pitr == st.begin()) {
+      return -SENTINEL;
+    }
+    if (x < pitr->second) {
+      return x;
+    }
+    return pitr->second - 1;
   }
 };
