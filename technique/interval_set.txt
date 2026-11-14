@@ -55,7 +55,7 @@ public:
   /**
    * 区間 [u,v) に属する全ての整数が
    * 条件を満たす場合に限って true を返す
-   * 区間の個数 M に対し時間計算量 O(M)
+   * 区間の個数 M に対し時間計算量 O(logM)
    */
   bool is_covered_entirely(T u, T v) {
     assert(-SENTINEL < u);
@@ -73,7 +73,7 @@ public:
 
   /**
    * 整数 x が条件を満たす場合に限って true を返す
-   * 区間の個数 M に対し時間計算量 O(M)
+   * 区間の個数 M に対し時間計算量 O(logM)
    */
   bool is_covered(T x) {
     assert(-SENTINEL < x && x < SENTINEL - 1);
@@ -227,5 +227,53 @@ public:
   T erase(T x) {
     assert(-SENTINEL < x && x < SENTINEL - 1);
     return erase_entirely(x, x + 1);
+  }
+
+  /**
+   * x 以上である整数であって
+   * 条件を満たさないもののうち最小の値を返す
+   * 区間の個数 M に対し時間計算量 O(logM)
+   */
+  T mex(T x) {
+    assert(-SENTINEL < x && x < SENTINEL - 1);
+    auto itr = st.lower_bound({x, x});
+    if (x == itr->first) {
+      return itr->second;
+    }
+
+    --itr;
+    return max(x, itr->second);
+  }
+
+  /**
+   * 区間 [u,v) に属する全ての整数を含む区間を返す
+   * 存在しない場合は番兵のうち負の値を持つ方を返す
+   * 区間の個数 M に対し時間計算量 O(logM)
+   */
+  auto find_entirely_covering_interval(T u, T v) {
+    assert(-SENTINEL < u);
+    assert(u < v);
+    assert(v < SENTINEL);
+
+    auto itr = st.lower_bound({u, u});
+    if (u < itr->first) {
+      --itr;
+    }
+
+    if (v <= itr->second) {
+      return *itr;
+    } else {
+      return *st.begin();
+    }
+  }
+
+  /**
+   * 整数 x を含む区間を返す
+   * 存在しない場合は番兵のうち負の値を持つ方を返す
+   * 区間の個数 M に対し時間計算量 O(logM)
+   */
+  auto find_covering_interval(T x) {
+    assert(-SENTINEL < x && x < SENTINEL - 1);
+    return find_entirely_covering_interval(x, x + 1);
   }
 };
