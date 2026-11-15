@@ -288,4 +288,14 @@ public:
     }
     return pitr->second - 1;
   }
+
+  /**
+   * 値 x がこのクラスで利用している番兵の
+   * どちらとも異なる場合に限って true を返す
+   * 「存在しない場合は番兵が返される」系の関数を利用したうえで
+   * デバッグ用の assert が必要になった時向けの処理
+   */
+  bool is_not_sentinel(T x) {
+    return x != SENTINEL && x != -SENTINEL;
+  }
 };
