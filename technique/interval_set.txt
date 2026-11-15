@@ -296,6 +296,7 @@ public:
    * デバッグ用の assert が必要になった時向けの処理
    */
   bool is_not_sentinel(T x) {
+    assert(-SENTINEL <= x && x <= SENTINEL);
     return x != SENTINEL && x != -SENTINEL;
   }
 };
