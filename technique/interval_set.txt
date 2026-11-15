@@ -17,6 +17,14 @@ template <class T = ll> class IntervalSet {
   set<interval> st;
   T element_cnt;
 
+  /**
+   * 左端の値が x 以上である区間のうち
+   * 最も左端の値が小さいものを指すイテレータを返す
+   */
+  auto get_lower_bound_iterator(T x) {
+    return st.lower_bound({x, x});
+  }
+
 public:
   /**
    * 番兵を持った状態でインスタンスが生成される
@@ -62,13 +70,13 @@ public:
     assert(u < v);
     assert(v < SENTINEL);
 
-    const auto itr = st.lower_bound({v, v});
-    if (v == itr->first) {
-      return false;
+    const auto itr = get_lower_bound_iterator(u);
+    if (u == itr->first) {
+      return v <= itr->second;
     }
 
     const auto pitr = prev(itr);
-    return pitr->first <= u && v <= pitr->second;
+    return v <= pitr->second;
   }
 
   /**
@@ -89,55 +97,33 @@ public:
     assert(u < v);
     assert(v < SENTINEL);
 
-    auto itr = st.lower_bound({u, u});
-    const auto pitr = prev(itr);
-
     interval added_interval = {u, v};
-    vector<interval> erased_intervals;
-    T res = v - u;
+    T res = 0;
 
-    auto adding_helper = [&]() {
-      while (1) {
-        if (itr->second <= v) {
-          erased_intervals.push_back(*itr);
-          ++itr;
-        } else {
-          if (v < itr->first) {
-            // [u,v) と交差しないので何もしない
-          } else {
-            added_interval.second = itr->second;
-            erased_intervals.push_back(*itr);
-          }
-
-          break;
-        }
-      }
-
-      // (追加される整数の個数) = (新しく追加した区間長) - (併合により消えた区間長の合計)
-      res = added_interval.second - added_interval.first;
-      for (interval &e : erased_intervals) {
-        res -= e.second - e.first;
-        st.erase(e);
-      }
-      st.insert(added_interval);
+    auto merge_and_subtract_length = [&](const interval &LR) {
+      const auto [L, R] = LR;
+      chmin(added_interval.first, L);
+      chmax(added_interval.second, R);
+      res -= R - L;
     };
 
-    if (u == itr->first) {
-      adding_helper();
-    } else if (pitr->second < u && v < itr->first) {
-      // [u,v) と交差する区間が存在しないため単にこれを追加するのみ
-      st.insert(added_interval);
-    } else {
-      if (pitr->second < u) {
-        // pitr 以前が指す区間は [u,v) と交差しない
-      } else {
-        added_interval.first = pitr->first;
-        added_interval.second = max(added_interval.second, pitr->second);
-        erased_intervals.push_back(*pitr);
+    auto itr = get_lower_bound_iterator(u);
+
+    if (u < itr->first) {
+      const auto pitr = prev(itr);
+      if (u <= pitr->second) {
+        merge_and_subtract_length(*pitr);
+        st.erase(pitr);
       }
-      adding_helper();
     }
 
+    while (itr->first <= v) {
+      merge_and_subtract_length(*itr);
+      itr = st.erase(itr);
+    }
+
+    st.insert(added_interval);
+    res += added_interval.second - added_interval.first;
     element_cnt += res;
     return res;
   }
@@ -160,59 +146,37 @@ public:
     assert(u < v);
     assert(v < SENTINEL);
 
-    auto itr = st.lower_bound({u, u});
-    const auto pitr = prev(itr);
-
-    vector<interval> erased_intervals;
     T res = 0;
+    auto itr = get_lower_bound_iterator(u);
 
-    auto erasing_helper = [&]() {
-      while (1) {
-        if (itr->second <= v) {
-          erased_intervals.push_back(*itr);
-          ++itr;
-        } else {
-          if (v <= itr->first) {
-            // [u,v) が影響しない区間なので何もしない
-          } else {
-            res += v - itr->first;
-            res -= itr->second - itr->first;
-            erased_intervals.push_back(*itr);
-            st.insert({v, itr->second});
-          }
-
-          break;
-        }
-      }
-
-      for (interval &e : erased_intervals) {
-        res += e.second - e.first;
-        st.erase(e);
-      }
-    };
-
-    if (u == itr->first) {
-      erasing_helper();
-    } else if (pitr->second <= u && v <= itr->first) {
-      // [u,v) により影響を受ける区間がないので何も削除されない
-    } else {
+    if (u < itr->first) {
+      const auto pitr = prev(itr);
       const auto [L, R] = *pitr;
 
-      if (pitr->second <= u) {
-        // [u,v) による影響が現れ得るのは itr が指す区間以降のみ
-        erasing_helper();
-      } else if (v < pitr->second) {
-        // pitr が指す区間のみが影響を受ける
-        st.erase(*pitr);
-        res = v - u;
-        st.insert({L, u});
-        st.insert({v, R});
+      if (u < R) {
+        st.erase(pitr);
+
+        if (v < R) {
+          res += v - u;
+          st.insert({L, u});
+          st.insert({v, R});
+        } else {
+          res += R - u;
+          st.insert({L, u});
+        }
+      }
+    }
+
+    while (itr->first < v) {
+      if (itr->second <= v) {
+        res += itr->second - itr->first;
+        itr = st.erase(itr);
       } else {
-        erased_intervals.push_back(*pitr);
-        erasing_helper();
-        // 交差部分に関して帳尻合わせ
-        res -= u - L;
-        st.insert({L, u});
+        const auto [L, R] = *itr;
+        res += v - L;
+        itr = st.erase(itr);
+        st.insert({v, R});
+        break;
       }
     }
 
@@ -236,7 +200,7 @@ public:
    */
   T mex(T x) {
     assert(-SENTINEL < x && x < SENTINEL - 1);
-    auto itr = st.lower_bound({x, x});
+    auto itr = get_lower_bound_iterator(x);
     if (x == itr->first) {
       return itr->second;
     }
@@ -255,7 +219,7 @@ public:
     assert(u < v);
     assert(v < SENTINEL);
 
-    auto itr = st.lower_bound({u, u});
+    auto itr = get_lower_bound_iterator(u);
     if (u < itr->first) {
       --itr;
     }
@@ -286,7 +250,7 @@ public:
   T min_valid_value_geq(T x) {
     assert(-SENTINEL < x && x < SENTINEL - 1);
 
-    auto itr = st.lower_bound({x, x});
+    auto itr = get_lower_bound_iterator(x);
     if (x == itr->first) {
       return x;
     }
@@ -310,7 +274,7 @@ public:
   T max_valid_value_leq(T x) {
     assert(-SENTINEL < x && x < SENTINEL - 1);
 
-    auto itr = st.lower_bound({x, x});
+    auto itr = get_lower_bound_iterator(x);
     if (x == itr->first) {
       return x;
     }
