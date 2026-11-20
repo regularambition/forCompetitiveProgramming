@@ -149,3 +149,35 @@ public:
     return this->val != other.val;
   }
 };
+
+/**
+ * 二項係数modが必要な時に使用するクラス
+ * 制約に合わせて SZ の値を調整すること
+ * テーブル構築事前処理のため
+ * O(SZlogMOD) の時間計算量がかかる
+ */
+template <ll MOD = 998244353> class Binomial {
+  static constexpr ll SZ = 353535;
+
+  inline static array<ModInt<MOD>, SZ> FACTORIAL{};
+  inline static array<ModInt<MOD>, SZ> FACTORIAL_INVERSE{};
+  inline static once_flag already_initialized;
+
+  Binomial() = delete;
+
+  // 最初の呼び出し時に一度だけ実行
+  static void initialize() {
+    call_once(already_initialized, []() {
+      rep(i, SZ) {
+        FACTORIAL[i] = (i != 0) ? FACTORIAL[i - 1] * i : 1;
+        FACTORIAL_INVERSE[i] = FACTORIAL[i].inverse();
+      }
+    });
+  }
+
+public:
+  static ModInt<MOD> find_binomial(ll n, ll r) {
+    initialize();
+    return FACTORIAL[n] * FACTORIAL_INVERSE[r] * FACTORIAL_INVERSE[n - r];
+  }
+};
